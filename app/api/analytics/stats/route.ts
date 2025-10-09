@@ -67,7 +67,7 @@ export async function GET() {
     const emergencies = calls.filter(c => c.emergency_detected).length
 
     // Fetch SMS stats
-    const { data: allSms, error: smsError } = await supabase
+    const { data: allSms, error: smsError } = await (supabase as any)
       .from('sms_communications')
       .select('id, created_at, delivery_status')
       .in('organization_id', orgIds)
@@ -76,15 +76,15 @@ export async function GET() {
       console.error('Error fetching SMS:', smsError)
     }
 
-    const sms = allSms || []
-    const thisWeekSms = sms.filter(s => new Date(s.created_at) >= startOfThisWeek)
-    const lastWeekSms = sms.filter(s => {
+    const sms = (allSms as any[]) || []
+    const thisWeekSms = sms.filter((s: any) => new Date(s.created_at) >= startOfThisWeek)
+    const lastWeekSms = sms.filter((s: any) => {
       const smsDate = new Date(s.created_at)
       return smsDate >= startOfLastWeek && smsDate < startOfThisWeek
     })
 
-    const deliveredSms = sms.filter(s => s.delivery_status === 'delivered').length
-    const failedSms = sms.filter(s => s.delivery_status === 'failed').length
+    const deliveredSms = sms.filter((s: any) => s.delivery_status === 'delivered').length
+    const failedSms = sms.filter((s: any) => s.delivery_status === 'failed').length
 
     // Fetch appointment stats
     const { data: allAppointments, error: apptError } = await supabase
