@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      appointments?.forEach(apt => {
+      const apts = (appointments as any[]) || []
+      apts.forEach((apt: any) => {
         activities.push({
           id: `appointment-${apt.id}`,
           type: 'appointment',
