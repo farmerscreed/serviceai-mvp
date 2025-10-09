@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizations/organization-context'
 import { useToast } from '@/components/ui/Toast'
@@ -23,7 +23,9 @@ interface Appointment {
   status: string
 }
 
-export default function RescheduleAppointmentPage({ params }: { params: { id: string } }) {
+export default function RescheduleAppointmentPage() {
+  const params = useParams<{ id: string }>()
+  const id = (params as any)?.id as string
   const { currentOrganization } = useOrganization()
   const router = useRouter()
   const toast = useToast()
@@ -38,14 +40,14 @@ export default function RescheduleAppointmentPage({ params }: { params: { id: st
   })
 
   useEffect(() => {
-    if (params.id) {
+    if (id) {
       loadAppointment()
     }
-  }, [params.id])
+  }, [id])
 
   const loadAppointment = async () => {
     try {
-      const response = await fetch(`/api/appointments/${params.id}`, { credentials: 'same-origin' })
+      const response = await fetch(`/api/appointments/${id}`, { credentials: 'same-origin' })
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
@@ -109,7 +111,7 @@ export default function RescheduleAppointmentPage({ params }: { params: { id: st
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/appointments/${params.id}`, {
+      const response = await fetch(`/api/appointments/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,7 +125,7 @@ export default function RescheduleAppointmentPage({ params }: { params: { id: st
 
       if (response.ok && result.success) {
         toast.success('Appointment rescheduled successfully!')
-        router.push(`/appointments/${params.id}`)
+        router.push(`/appointments/${id}`)
       } else {
         toast.error(result.error || 'Failed to reschedule appointment')
       }
@@ -182,7 +184,7 @@ export default function RescheduleAppointmentPage({ params }: { params: { id: st
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Link
-          href={`/appointments/${params.id}`}
+          href={`/appointments/${id}`}
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -289,7 +291,7 @@ export default function RescheduleAppointmentPage({ params }: { params: { id: st
           {/* Actions */}
           <div className="flex items-center justify-end gap-4">
             <Link
-              href={`/appointments/${params.id}`}
+              href={`/appointments/${id}`}
               className="flex items-center gap-2 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <X className="w-4 h-4" />
