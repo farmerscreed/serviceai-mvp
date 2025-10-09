@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create or get customer
-    const { data: customer, error: customerError } = await supabase
+    const { data: customer, error: customerError } = await (supabase as any)
       .from('customers')
       .upsert({
         organization_id: organizationId,
