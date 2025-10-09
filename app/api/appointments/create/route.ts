@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create appointment in database
-    const { data: appointment, error: appointmentError } = await supabase
+    const { data: appointment, error: appointmentError } = await (supabase as any)
       .from('appointments')
       .insert({
         organization_id: organizationId,
