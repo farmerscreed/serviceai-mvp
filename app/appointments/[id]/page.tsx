@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizations/organization-context'
 import { useToast } from '@/components/ui/Toast'
@@ -63,7 +63,9 @@ interface SMSLog {
   delivered_at?: string
 }
 
-export default function AppointmentDetailPage({ params }: { params: { id: string } }) {
+export default function AppointmentDetailPage() {
+  const params = useParams<{ id: string }>()
+  const id = (params as any)?.id as string
   const { currentOrganization } = useOrganization()
   const router = useRouter()
   const toast = useToast()
@@ -75,15 +77,15 @@ export default function AppointmentDetailPage({ params }: { params: { id: string
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    if (params.id) {
+    if (id) {
       loadAppointment()
       loadSMSLogs()
     }
-  }, [params.id])
+  }, [id])
 
   const loadAppointment = async () => {
     try {
-      const response = await fetch(`/api/appointments/${params.id}`, { credentials: 'same-origin' })
+      const response = await fetch(`/api/appointments/${id}`, { credentials: 'same-origin' })
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
@@ -107,7 +109,7 @@ export default function AppointmentDetailPage({ params }: { params: { id: string
 
   const loadSMSLogs = async () => {
     try {
-      const response = await fetch(`/api/appointments/${params.id}/sms`, { credentials: 'same-origin' })
+      const response = await fetch(`/api/appointments/${id}/sms`, { credentials: 'same-origin' })
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
@@ -207,7 +209,7 @@ export default function AppointmentDetailPage({ params }: { params: { id: string
   }
 
   const handleReschedule = () => {
-    router.push(`/appointments/${params.id}/reschedule`)
+    router.push(`/appointments/${id}/reschedule`)
   }
 
   if (loading) {
