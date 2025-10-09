@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get available time slots using database function
-    const { data: slots, error } = await supabase
+    const { data: slots, error } = await (supabase as any)
       .rpc('get_available_time_slots', {
         org_id: organizationId,
         target_date: date,
