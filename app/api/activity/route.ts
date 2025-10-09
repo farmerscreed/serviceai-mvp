@@ -64,7 +64,8 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      emergencies?.forEach(emergency => {
+      const ems = (emergencies as any[]) || []
+      ems.forEach((emergency: any) => {
         activities.push({
           id: `emergency-${emergency.id}`,
           type: 'emergency',
