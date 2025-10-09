@@ -61,7 +61,7 @@ export async function PATCH(
     const body = await request.json()
 
     // Get existing appointment to verify access
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: fetchError } = await (supabase as any)
       .from('appointments')
       .select('organization_id, scheduled_date, scheduled_time')
       .eq('id', id)
