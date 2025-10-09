@@ -1,0 +1,43 @@
+{
+  "name": "serviceai",
+  "version": "1.0.0",
+  "description": "A comprehensive SaaS platform providing AI-powered phone assistants for multiple service industries with configurable templates, multi-language support (English/Spanish), and integrated SMS communications.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "validate-setup": "tsx scripts/validate-setup.ts",
+    "verify-auth": "tsx scripts/verify-auth-setup.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.19.1",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.58.0",
+    "@vapi-ai/server-sdk": "^0.10.2",
+    "next": "^15.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "stripe": "^14.14.0",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/node": "^24.6.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
