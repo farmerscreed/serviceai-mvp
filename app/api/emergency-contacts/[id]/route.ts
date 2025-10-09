@@ -3,9 +3,10 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -17,7 +18,7 @@ export async function GET(
     const { data: contact, error } = await supabase
       .from('emergency_contacts')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
     
     if (error || !contact) {
@@ -43,9 +44,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -59,7 +61,7 @@ export async function PATCH(
     const { data: existing, error: fetchError } = await supabase
       .from('emergency_contacts')
       .select('organization_id, is_primary')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
     
     if (fetchError || !existing) {
@@ -98,7 +100,7 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabase
       .from('emergency_contacts')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
     
@@ -126,9 +128,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -140,7 +143,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('emergency_contacts')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
     
     if (error) {
       console.error('Emergency contact deletion error:', error)

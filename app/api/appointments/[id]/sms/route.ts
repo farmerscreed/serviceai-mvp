@@ -3,9 +3,10 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -28,7 +29,7 @@ export async function GET(
     const { data: appointment, error: appointmentError } = await supabase
       .from('appointments')
       .select('organization_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
     
     if (appointmentError || !appointment) {
@@ -44,7 +45,7 @@ export async function GET(
       .from('sms_communications')
       .select('*')
       .eq('organization_id', membership.organization_id)
-      .eq('appointment_id', params.id)
+      .eq('appointment_id', id)
       .order('created_at', { ascending: false })
     
     if (error) {

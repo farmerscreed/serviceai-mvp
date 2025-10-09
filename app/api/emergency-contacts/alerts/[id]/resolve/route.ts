@@ -3,9 +3,10 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -24,7 +25,7 @@ export async function POST(
       return NextResponse.json({ error: 'No organization found' }, { status: 404 })
     }
 
-    const alertId = params.id
+    const alertId = id
 
     // Update the emergency notification status
     const { data: updatedAlert, error } = await supabase
