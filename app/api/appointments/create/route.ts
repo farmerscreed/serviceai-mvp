@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     // Update appointment with calendar event ID
     if (eventId) {
       const calendarField = `${provider}_calendar_event_id`
-      await supabase
+      await (supabase as any)
         .from('appointments')
         .update({
           [calendarField]: eventId,
