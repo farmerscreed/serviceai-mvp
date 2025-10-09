@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch emergency notifications if type matches
     if (!type || type === 'emergencies') {
-      const { data: emergencies } = await supabase
+      const { data: emergencies } = await (supabase as any)
         .from('emergency_notifications')
         .select('*')
         .in('organization_id', orgIds)
