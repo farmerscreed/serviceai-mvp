@@ -14,7 +14,14 @@
       "Bash(npm run dev:*)",
       "mcp__supabase__list_migrations",
       "mcp__supabase__execute_sql",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(npm run build:*)",
+      "Bash(powershell -Command \"(Get-Content ''app/api/assistants/[id]/route.ts'') -replace \"\"\\.from\\(''vapi_assistants''\\)\"\", \"\".from(''vapi_assistants'' as any)\"\" | Set-Content ''app/api/assistants/[id]/route.ts''\")",
+      "Bash(powershell -Command \"(Get-Content ''app/api/assistants/list/route.ts'') -replace \"\".from\\(''vapi_assistants''\\)\"\", \"\".from(''vapi_assistants'' as any)\"\" | Set-Content ''app/api/assistants/list/route.ts''\")",
+      "Bash(powershell:*)",
+      "Bash(curl:*)",
+      "mcp__supabase__get_logs",
+      "Bash(node -e \"try { require(''F:/APPS/ServiceAI/lib/vapi/multilingual-vapi-service.ts''); console.log(''OK''); } catch(e) { console.log(''Error:'', e.message); }\")"
     ]
   },
   "enableAllProjectMcpServers": true,

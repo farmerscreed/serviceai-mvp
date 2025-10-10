@@ -19,14 +19,14 @@ export async function POST(request: Request) {
     }
 
     // Verify user is owner or admin
-    const { data: hasPermission } = await supabase
-      .rpc('user_has_role', {
-        p_user_id: user.id,
-        p_organization_id: organization_id,
-        p_required_role: 'admin'
-      })
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('organization_id', organization_id)
+      .single()
 
-    if (!hasPermission) {
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
     }
 

@@ -4,7 +4,7 @@ import { forwardRef, HTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'bordered' | 'elevated' | 'flat'
+  variant?: 'default' | 'bordered' | 'elevated' | 'flat' | 'sparkle' | 'sparkle-glass'
   padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl'
   hoverable?: boolean
   clickable?: boolean
@@ -30,6 +30,8 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       bordered: 'border-2 border-gray-200',
       elevated: 'shadow-md hover:shadow-lg',
       flat: 'border border-gray-100',
+      sparkle: 'sparkle-card',
+      'sparkle-glass': 'sparkle-glass rounded-2xl shadow-xl',
     }
 
     const paddingStyles = {

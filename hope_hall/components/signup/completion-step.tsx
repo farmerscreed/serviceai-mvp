@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/Button';
 import { CheckCircle2, Phone, Mail, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 

@@ -36,7 +36,7 @@ export async function GET() {
 
     // Get assistants count
     const { data: assistants, error: assistError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .select('id, industry_code, language_code, is_active')
       .in('organization_id', orgIds)
 
@@ -47,12 +47,12 @@ export async function GET() {
 
     // Calculate stats
     const total = assistants?.length || 0
-    const active = assistants?.filter(a => a.is_active).length || 0
-    
+    const active = assistants?.filter((a: any) => a.is_active).length || 0
+
     const byIndustry: Record<string, number> = {}
     const byLanguage: Record<string, number> = {}
-    
-    assistants?.forEach(a => {
+
+    assistants?.forEach((a: any) => {
       byIndustry[a.industry_code] = (byIndustry[a.industry_code] || 0) + 1
       byLanguage[a.language_code] = (byLanguage[a.language_code] || 0) + 1
     })

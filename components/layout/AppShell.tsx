@@ -20,6 +20,18 @@ const publicRoutes = [
   '/onboarding',
   '/invitations/accept',
   '/',
+  '/pricing',
+  '/docs',
+  '/help',
+  '/contact',
+  '/about',
+  '/blog',
+  '/careers',
+  '/privacy',
+  '/terms',
+  '/cookies',
+  '/gdpr',
+  '/status',
 ]
 
 export default function AppShell({ children }: AppShellProps) {
@@ -29,7 +41,9 @@ export default function AppShell({ children }: AppShellProps) {
   
   // Check if current route should use AppShell
   const isPublicRoute = publicRoutes.some(route => {
-    if (route === '/') return pathname === '/'
+    if (route === '/') {
+      return pathname === '/'
+    }
     return pathname.startsWith(route)
   })
 

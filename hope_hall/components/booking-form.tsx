@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -140,9 +140,9 @@ export function BookingForm({ organizationId, onBookingCreated, initialData }: B
       const formattedDate = formatDateForDB(data.event_date);
       
       // Debug logging
-      console.log('🔍 Original date object:', data.event_date);
-      console.log('🔍 Formatted date for DB:', formattedDate);
-      console.log('🔍 Full booking data:', JSON.stringify({
+      console.log('?? Original date object:', data.event_date);
+      console.log('?? Formatted date for DB:', formattedDate);
+      console.log('?? Full booking data:', JSON.stringify({
         ...data,
         event_date: formattedDate
       }, null, 2));
@@ -165,7 +165,7 @@ export function BookingForm({ organizationId, onBookingCreated, initialData }: B
       form.reset();
       onBookingCreated();
     } catch (error: any) {
-      console.error('❌ Booking creation error:', error);
+      console.error('? Booking creation error:', error);
       toast({
         variant: "destructive",
         title: "Error",

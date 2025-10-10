@@ -178,6 +178,7 @@ export class MultilingualWebhookHandler {
         default:
           logger.warn(`Unhandled webhook type: ${webhookData.type}`, context)
           result = { status: 'processed', message: 'Event type not handled' }
+        }
       }
 
       // 6. Log webhook event

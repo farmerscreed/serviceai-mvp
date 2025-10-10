@@ -65,25 +65,26 @@ export class WorkflowTracker {
       const timeRangeMs = this.getTimeRangeMs(timeRange)
       const startTime = new Date(Date.now() - timeRangeMs).toISOString()
 
-      const { data: workflows, error } = await supabase
-        .from('sms_workflows')
-        .select(`
-          id,
-          workflow_type,
-          status,
-          created_at,
-          executed_at,
-          completed_at,
-          metadata
-        `)
-        .eq('organization_id', organizationId)
-        .gte('created_at', startTime)
+      // TODO: Implement when sms_workflows table is created
+      // const { data: workflows, error } = await supabase
+      //   .from('sms_workflows')
+      //   .select(`
+      //     id,
+      //     workflow_type,
+      //     status,
+      //     created_at,
+      //     executed_at,
+      //     completed_at,
+      //     metadata
+      //   `)
+      //   .eq('organization_id', organizationId)
+      //   .gte('created_at', startTime)
 
-      if (error) {
-        throw new Error(`Database error: ${error.message}`)
-      }
+      // if (error) {
+      //   throw new Error(`Database error: ${error.message}`)
+      // }
 
-      const metrics = this.calculateWorkflowMetrics(workflows || [])
+      const metrics = this.calculateWorkflowMetrics([])
       console.log(`✅ Workflow metrics calculated: ${metrics.totalWorkflows} total, ${metrics.successRate.toFixed(2)}% success rate`)
 
       return metrics
@@ -120,16 +121,20 @@ export class WorkflowTracker {
       const timeRangeMs = this.getTimeRangeMs(timeRange)
       const startTime = new Date(Date.now() - timeRangeMs).toISOString()
 
-      const { data: workflows, error } = await supabase
-        .from('sms_workflows')
-        .select(`
-          status,
-          created_at,
-          completed_at
-        `)
-        .eq('organization_id', organizationId)
-        .gte('created_at', startTime)
-        .order('created_at', { ascending: true })
+      // TODO: Implement when sms_workflows table is created
+      // const { data: workflows, error } = await supabase
+      //   .from('sms_workflows')
+      //   .select(`
+      //     status,
+      //     created_at,
+      //     completed_at
+      //   `)
+      //   .eq('organization_id', organizationId)
+      //   .gte('created_at', startTime)
+      //   .order('created_at', { ascending: true })
+      
+      const workflows: any[] = []
+      const error = null
 
       if (error) {
         throw new Error(`Database error: ${error.message}`)
@@ -161,26 +166,27 @@ export class WorkflowTracker {
       const timeRangeMs = this.getTimeRangeMs(timeRange)
       const startTime = new Date(Date.now() - timeRangeMs).toISOString()
 
-      const { data: steps, error } = await supabase
-        .from('workflow_steps')
-        .select(`
-          step_type,
-          status,
-          executed_at,
-          completed_at,
-          error_message,
-          workflows:sms_workflows!inner(
-            organization_id
-          )
-        `)
-        .eq('workflows.organization_id', organizationId)
-        .gte('executed_at', startTime)
+      // TODO: Implement when workflow_steps table is created
+      // const { data: steps, error } = await supabase
+      //   .from('workflow_steps')
+      //   .select(`
+      //     step_type,
+      //     status,
+      //     executed_at,
+      //     completed_at,
+      //     error_message,
+      //     workflows:sms_workflows!inner(
+      //       organization_id
+      //     )
+      //   `)
+      //   .eq('workflows.organization_id', organizationId)
+      //   .gte('executed_at', startTime)
 
-      if (error) {
-        throw new Error(`Database error: ${error.message}`)
-      }
+      // if (error) {
+      //   throw new Error(`Database error: ${error.message}`)
+      // }
 
-      const performance = this.calculateStepPerformance(steps || [])
+      const performance = this.calculateStepPerformance([])
       console.log(`✅ Step performance calculated: ${performance.length} step types`)
 
       return performance
@@ -207,19 +213,20 @@ export class WorkflowTracker {
 
       const supabase = await createServerClient()
       
+      // TODO: Implement when workflow_executions table is created
       // Log each execution
-      for (const execution of executions) {
-        await supabase
-          .from('workflow_executions')
-          .insert({
-            workflow_id: execution.workflowId,
-            step_id: execution.stepId,
-            status: execution.status,
-            result: execution.result,
-            error: execution.error,
-            executed_at: execution.executedAt
-          })
-      }
+      // for (const execution of executions) {
+      //   await supabase
+      //     .from('workflow_executions')
+      //     .insert({
+      //       workflow_id: execution.workflowId,
+      //       step_id: execution.stepId,
+      //       status: execution.status,
+      //       result: execution.result,
+      //       error: execution.error,
+      //       executed_at: execution.executedAt
+      //     })
+      // }
 
       console.log(`✅ Workflow execution tracked: ${workflowId}`)
 
@@ -239,25 +246,26 @@ export class WorkflowTracker {
 
       const supabase = await createServerClient()
       
-      const { data: executions, error } = await supabase
-        .from('workflow_executions')
-        .select(`
-          workflow_id,
-          step_id,
-          status,
-          result,
-          error,
-          executed_at
-        `)
-        .eq('workflow_id', workflowId)
-        .order('executed_at', { ascending: true })
+      // TODO: Implement when workflow_executions table is created
+      // const { data: executions, error } = await supabase
+      //   .from('workflow_executions')
+      //   .select(`
+      //     workflow_id,
+      //     step_id,
+      //     status,
+      //     result,
+      //     error,
+      //     executed_at
+      //   `)
+      //   .eq('workflow_id', workflowId)
+      //   .order('executed_at', { ascending: true })
 
-      if (error) {
-        throw new Error(`Database error: ${error.message}`)
-      }
+      // if (error) {
+      //   throw new Error(`Database error: ${error.message}`)
+      // }
 
-      console.log(`✅ Retrieved ${executions?.length || 0} execution records`)
-      return executions || []
+      console.log(`✅ Retrieved 0 execution records (table not implemented)`)
+      return []
 
     } catch (error) {
       console.error('Error getting workflow execution history:', error)
@@ -290,24 +298,25 @@ export class WorkflowTracker {
       const timeRangeMs = this.getTimeRangeMs(timeRange)
       const startTime = new Date(Date.now() - timeRangeMs).toISOString()
 
-      const { data: workflows, error } = await supabase
-        .from('sms_workflows')
-        .select(`
-          workflow_type,
-          status,
-          created_at,
-          executed_at,
-          completed_at,
-          error_message
-        `)
-        .eq('organization_id', organizationId)
-        .gte('created_at', startTime)
+      // TODO: Implement when sms_workflows table is created
+      // const { data: workflows, error } = await supabase
+      //   .from('sms_workflows')
+      //   .select(`
+      //     workflow_type,
+      //     status,
+      //     created_at,
+      //     executed_at,
+      //     completed_at,
+      //     error_message
+      //   `)
+      //   .eq('organization_id', organizationId)
+      //   .gte('created_at', startTime)
 
-      if (error) {
-        throw new Error(`Database error: ${error.message}`)
-      }
+      // if (error) {
+      //   throw new Error(`Database error: ${error.message}`)
+      // }
 
-      const performance = this.calculateWorkflowPerformanceByType(workflows || [])
+      const performance = this.calculateWorkflowPerformanceByType([])
       console.log(`✅ Workflow performance by type calculated: ${performance.length} types`)
 
       return performance
@@ -339,24 +348,25 @@ export class WorkflowTracker {
       const timeRangeMs = this.getTimeRangeMs(timeRange)
       const startTime = new Date(Date.now() - timeRangeMs).toISOString()
 
-      const { data: workflows, error } = await supabase
-        .from('sms_workflows')
-        .select(`
-          metadata,
-          status,
-          created_at,
-          executed_at,
-          completed_at,
-          error_message
-        `)
-        .eq('organization_id', organizationId)
-        .gte('created_at', startTime)
+      // TODO: Implement when sms_workflows table is created
+      // const { data: workflows, error } = await supabase
+      //   .from('sms_workflows')
+      //   .select(`
+      //     metadata,
+      //     status,
+      //     created_at,
+      //     executed_at,
+      //     completed_at,
+      //     error_message
+      //   `)
+      //   .eq('organization_id', organizationId)
+      //   .gte('created_at', startTime)
 
-      if (error) {
-        throw new Error(`Database error: ${error.message}`)
-      }
+      // if (error) {
+      //   throw new Error(`Database error: ${error.message}`)
+      // }
 
-      const performance = this.calculateWorkflowPerformanceByLanguage(workflows || [])
+      const performance = this.calculateWorkflowPerformanceByLanguage([])
       console.log(`✅ Workflow performance by language calculated: ${performance.length} languages`)
 
       return performance

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/Badge';
 import { Calendar, Clock, AlertCircle, CheckCircle, RefreshCw, Settings } from 'lucide-react';
 import { CalendarEvent, IntegrationStatus } from '@/lib/oauth/types';
 import { CalendarSyncService } from '@/lib/calendar/sync-service';

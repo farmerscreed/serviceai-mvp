@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success'
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'sparkle' | 'sparkle-secondary'
   size?: 'sm' | 'md' | 'lg' | 'xl'
   loading?: boolean
   fullWidth?: boolean
@@ -38,6 +38,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500 active:bg-gray-200',
       danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 active:bg-red-800 shadow-sm hover:shadow-md',
       success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 active:bg-green-800 shadow-sm hover:shadow-md',
+      sparkle: 'sparkle-button',
+      'sparkle-secondary': 'sparkle-button-secondary',
     }
 
     const sizeStyles = {

@@ -1,4 +1,4 @@
-ï»¿"use client";
+"use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -257,7 +257,7 @@ export function BookingEditForm({ booking, onBookingUpdated, onCancel }: Booking
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="Wedding">Wedding</SelectItem>
-                    <SelectItem value="QuinceaÃ±era">QuinceaÃ±era</SelectItem>
+                    <SelectItem value="Quinceañera">Quinceañera</SelectItem>
                     <SelectItem value="Corporate">Corporate Event</SelectItem>
                     <SelectItem value="Birthday">Birthday Party</SelectItem>
                     <SelectItem value="Anniversary">Anniversary</SelectItem>

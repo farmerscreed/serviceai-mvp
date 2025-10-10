@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Book, Settings, Zap, Database, Calendar, Phone } from 'lucide-react'
-import { Card, CardHeader, CardContent } from '@/components/ui/Card'
+import { ArrowLeft, Book, Settings, Zap, Database, Calendar, Phone, Sparkles, Rocket, Shield, Users } from 'lucide-react'
 
 export default function DocsHomePage() {
   const docSections = [
@@ -11,107 +10,134 @@ export default function DocsHomePage() {
       title: 'Getting Started',
       description: 'Quick setup and first steps',
       href: '/docs/setup/quick-start',
-      color: 'bg-blue-100 text-blue-600',
+      gradient: 'from-sparkle-500 to-purple-500',
     },
     {
       icon: Zap,
       title: 'AI Assistant Setup',
       description: 'Configure your AI assistant with Vapi.ai',
       href: '/docs/integrations/vapi-setup',
-      color: 'bg-purple-100 text-purple-600',
+      gradient: 'from-purple-500 to-pink-500',
     },
     {
       icon: Phone,
       title: 'SMS Integration',
       description: 'Set up Twilio SMS for customer communication',
       href: '/docs/integrations/twilio-setup',
-      color: 'bg-green-100 text-green-600',
+      gradient: 'from-emerald-500 to-sparkle-500',
     },
     {
       icon: Calendar,
       title: 'Calendar Integration',
       description: 'Connect Google Calendar, Outlook, or Calendly',
       href: '/docs/integrations/calendar-setup',
-      color: 'bg-orange-100 text-orange-600',
+      gradient: 'from-amber-500 to-orange-500',
     },
     {
       icon: Database,
       title: 'Database Schema',
       description: 'Understanding the data structure',
       href: '/docs/development/database-schema',
-      color: 'bg-gray-100 text-gray-600',
+      gradient: 'from-gray-500 to-gray-600',
     },
     {
       icon: Book,
       title: 'Architecture',
       description: 'System architecture and design patterns',
       href: '/docs/development/architecture',
-      color: 'bg-indigo-100 text-indigo-600',
+      gradient: 'from-indigo-500 to-purple-500',
     },
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <Link
-          href="/help"
-          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Help
-        </Link>
-
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-            <Book className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">ServiceAI Documentation</h1>
-            <p className="text-gray-600">Complete guides and technical reference</p>
+    <div>
+      {/* Header */}
+      <div className="text-center mb-12">
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <div className="w-16 h-16 bg-gradient-to-br from-sparkle-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <Book className="w-8 h-8 text-white" />
+            </div>
+            <div className="absolute -inset-1 bg-gradient-to-br from-sparkle-500 to-purple-500 rounded-2xl blur opacity-30"></div>
           </div>
         </div>
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4">
+          ServiceAI Documentation
+        </h1>
+        <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
+          Everything you need to get started with ServiceAI's AI-powered phone assistant platform.
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {docSections.map((section) => {
-            const Icon = section.icon
-            return (
-              <Link key={section.title} href={section.href}>
-                <Card hoverable clickable padding="lg">
-                  <div className={`w-12 h-12 ${section.color} rounded-lg flex items-center justify-center mb-4`}>
-                    <Icon className="w-6 h-6" />
+      {/* Quick Start */}
+      <div className="mb-12">
+        <div className="sparkle-card p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-sparkle-500 rounded-xl flex items-center justify-center">
+              <Rocket className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Quick Start Guide</h2>
+          <p className="text-gray-600 mb-6">Get your AI assistant up and running in 5 minutes</p>
+          <Link
+            href="/docs/setup/quick-start"
+            className="sparkle-button"
+          >
+            Start Here
+          </Link>
+        </div>
+      </div>
+
+      {/* Documentation Sections */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {docSections.map((section) => {
+          const Icon = section.icon
+          return (
+            <Link
+              key={section.href}
+              href={section.href}
+              className="group block"
+            >
+              <div className="sparkle-card p-6 h-full hover:scale-105 transition-all duration-300">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className={`w-12 h-12 bg-gradient-to-br ${section.gradient} rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
+                    <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{section.title}</h3>
-                  <p className="text-sm text-gray-600">{section.description}</p>
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
-
-        <div className="mt-12">
-          <Card padding="lg">
-            <CardHeader title="Quick Links" />
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">For New Users</h4>
-                  <ul className="space-y-1 text-sm text-gray-600">
-                    <li>• <Link href="/docs/setup/quick-start" className="text-blue-600 hover:text-blue-700">Quick Start Guide</Link></li>
-                    <li>• <Link href="/docs/integrations/vapi-setup" className="text-blue-600 hover:text-blue-700">Setting Up Your First Assistant</Link></li>
-                    <li>• <Link href="/docs/integrations/twilio-setup" className="text-blue-600 hover:text-blue-700">SMS Configuration</Link></li>
-                  </ul>
+                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-sparkle-600 transition-colors">
+                    {section.title}
+                  </h3>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">For Developers</h4>
-                  <ul className="space-y-1 text-sm text-gray-600">
-                    <li>• <Link href="/docs/development/architecture" className="text-blue-600 hover:text-blue-700">System Architecture</Link></li>
-                    <li>• <Link href="/docs/development/database-schema" className="text-blue-600 hover:text-blue-700">Database Schema</Link></li>
-                    <li>• <Link href="/docs/development/mvp-roadmap" className="text-blue-600 hover:text-blue-700">MVP Roadmap</Link></li>
-                  </ul>
-                </div>
+                <p className="text-gray-600">{section.description}</p>
               </div>
-            </CardContent>
-          </Card>
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Support Section */}
+      <div className="sparkle-card p-8 text-center">
+        <div className="flex justify-center mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+            <Users className="w-6 h-6 text-white" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Need Help?</h2>
+        <p className="text-gray-600 mb-6">
+          Can't find what you're looking for? Our support team is here to help.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link
+            href="/help"
+            className="sparkle-button"
+          >
+            Contact Support
+          </Link>
+          <Link
+            href="/docs/development/architecture"
+            className="sparkle-button-secondary"
+          >
+            View Architecture
+          </Link>
         </div>
       </div>
     </div>

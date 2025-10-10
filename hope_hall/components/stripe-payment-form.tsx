@@ -9,9 +9,9 @@ import {
   useElements,
   PaymentElement
 } from '@stripe/react-stripe-js'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { CreditCard, Shield, Clock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'

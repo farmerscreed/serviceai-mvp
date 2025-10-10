@@ -18,7 +18,7 @@ export async function GET(
 
     // Get assistant
     const { data: assistant, error: assistantError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .select('*')
       .eq('id', id)
       .single()
@@ -34,7 +34,7 @@ export async function GET(
     const { data: membership } = await supabase
       .from('organization_members')
       .select('role')
-      .eq('organization_id', assistant.organization_id)
+      .eq('organization_id', (assistant as any).organization_id)
       .eq('user_id', user.id)
       .single()
 
@@ -77,7 +77,7 @@ export async function PATCH(
 
     // Get assistant to verify access
     const { data: assistant, error: assistantError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .select('organization_id')
       .eq('id', id)
       .single()
@@ -93,7 +93,7 @@ export async function PATCH(
     const { data: membership } = await supabase
       .from('organization_members')
       .select('role')
-      .eq('organization_id', assistant.organization_id)
+      .eq('organization_id', (assistant as any).organization_id)
       .eq('user_id', user.id)
       .single()
 
@@ -116,7 +116,7 @@ export async function PATCH(
 
     // Update assistant
     const { data: updatedAssistant, error: updateError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .update(updates)
       .eq('id', id)
       .select()
@@ -160,7 +160,7 @@ export async function DELETE(
 
     // Get assistant to verify access and get Vapi assistant ID
     const { data: assistant, error: assistantError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .select('organization_id, vapi_assistant_id, vapi_phone_number')
       .eq('id', id)
       .single()
@@ -176,7 +176,7 @@ export async function DELETE(
     const { data: membership } = await supabase
       .from('organization_members')
       .select('role')
-      .eq('organization_id', assistant.organization_id)
+      .eq('organization_id', (assistant as any).organization_id)
       .eq('user_id', user.id)
       .single()
 
@@ -191,11 +191,11 @@ export async function DELETE(
     const vapiBaseUrl = process.env.NEXT_PUBLIC_VAPI_BASE_URL || 'https://api.vapi.ai'
 
     // Delete from Vapi first (if we have API key and assistant ID)
-    if (vapiApiKey && assistant.vapi_assistant_id) {
+    if (vapiApiKey && (assistant as any).vapi_assistant_id) {
       try {
-        console.log('🗑️ Deleting assistant from Vapi:', assistant.vapi_assistant_id)
+        console.log('🗑️ Deleting assistant from Vapi:', (assistant as any).vapi_assistant_id)
         
-        const vapiResponse = await fetch(`${vapiBaseUrl}/assistant/${assistant.vapi_assistant_id}`, {
+        const vapiResponse = await fetch(`${vapiBaseUrl}/assistant/${(assistant as any).vapi_assistant_id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${vapiApiKey}`
@@ -212,8 +212,8 @@ export async function DELETE(
         }
 
         // If assistant has a phone number, also delete/unassign it
-        if (assistant.vapi_phone_number) {
-          console.log('📞 Unassigning phone number:', assistant.vapi_phone_number)
+        if ((assistant as any).vapi_phone_number) {
+          console.log('📞 Unassigning phone number:', (assistant as any).vapi_phone_number)
           // Note: Phone number deletion is handled by Vapi when assistant is deleted
           // But we log it for transparency
         }
@@ -227,7 +227,7 @@ export async function DELETE(
 
     // Delete assistant from database
     const { error: deleteError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .delete()
       .eq('id', id)
 

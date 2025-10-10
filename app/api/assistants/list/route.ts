@@ -28,7 +28,7 @@ export async function GET() {
 
     // Get assistants for user's organizations
     const { data: assistants, error: assistError } = await supabase
-      .from('vapi_assistants')
+      .from('vapi_assistants' as any)
       .select(`
         id,
         organization_id,

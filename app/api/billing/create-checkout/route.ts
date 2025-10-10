@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     // Verify user is owner or admin
     const { data: hasPermission } = await supabase
-      .rpc('user_has_role', {
+      .rpc('user_has_role' as any, {
         p_user_id: user.id,
         p_organization_id: organization_id,
         p_required_role: 'admin'
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     // If organization already has an active subscription, return error
-    if (org.stripe_subscription_id) {
+    if ((org as any).stripe_subscription_id) {
       return NextResponse.json(
         { error: 'Organization already has an active subscription. Use Customer Portal to manage.' },
         { status: 400 }
@@ -53,11 +53,11 @@ export async function POST(request: Request) {
     }
 
     // Create Stripe customer if doesn't exist
-    let customerId = org.stripe_customer_id
+    let customerId = (org as any).stripe_customer_id
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
-        name: org.name,
+        name: (org as any).name,
         metadata: {
           organization_id: organization_id,
           owner_id: user.id,

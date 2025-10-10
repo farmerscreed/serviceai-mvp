@@ -63,13 +63,13 @@ export class TemplateLoader {
         .from('industry_templates')
         .update({
           display_name: template.display_name,
-          template_config: template.template_config,
-          emergency_patterns: template.emergency_patterns,
-          appointment_types: template.appointment_types,
-          required_fields: template.required_fields,
-          sms_templates: template.sms_templates,
-          cultural_guidelines: template.cultural_guidelines,
-          integration_requirements: template.integration_requirements,
+          template_config: template.template_config as any,
+          emergency_patterns: template.emergency_patterns as any,
+          appointment_types: template.appointment_types as any,
+          required_fields: template.required_fields as any,
+          sms_templates: template.sms_templates as any,
+          cultural_guidelines: template.cultural_guidelines as any,
+          integration_requirements: template.integration_requirements as any,
           version: template.version,
           is_active: template.is_active,
           updated_at: new Date().toISOString()
@@ -87,13 +87,13 @@ export class TemplateLoader {
           industry_code: template.industry_code,
           language_code: template.language_code,
           display_name: template.display_name,
-          template_config: template.template_config,
-          emergency_patterns: template.emergency_patterns,
-          appointment_types: template.appointment_types,
-          required_fields: template.required_fields,
-          sms_templates: template.sms_templates,
-          cultural_guidelines: template.cultural_guidelines,
-          integration_requirements: template.integration_requirements,
+          template_config: template.template_config as any,
+          emergency_patterns: template.emergency_patterns as any,
+          appointment_types: template.appointment_types as any,
+          required_fields: template.required_fields as any,
+          sms_templates: template.sms_templates as any,
+          cultural_guidelines: template.cultural_guidelines as any,
+          integration_requirements: template.integration_requirements as any,
           version: template.version,
           is_active: template.is_active
         })
@@ -256,7 +256,7 @@ export class TemplateLoader {
       throw new Error(`Database error: ${error.message}`)
     }
 
-    return data as IndustryTemplate[]
+    return data as unknown as IndustryTemplate[]
   }
 
   /**
@@ -280,7 +280,7 @@ export class TemplateLoader {
       throw new Error(`Database error: ${error.message}`)
     }
 
-    return data as IndustryTemplate
+    return data as unknown as IndustryTemplate
   }
 
   /**

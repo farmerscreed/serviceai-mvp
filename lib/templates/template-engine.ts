@@ -115,7 +115,7 @@ export class MultiLanguageTemplateEngine {
       return null
     }
 
-    return data as IndustryTemplate
+    return data as unknown as IndustryTemplate
   }
 
   private cacheTemplate(cacheKey: string, template: IndustryTemplate): void {
@@ -151,10 +151,10 @@ export class MultiLanguageTemplateEngine {
 
     // Base system prompt from template
     let systemPrompt = template.template_config.system_prompt_template
-      .replace('{business_name}', businessData.business_name)
-      .replace('{business_phone}', businessData.business_phone)
-      .replace('{business_address}', businessData.business_address)
-      .replace('{business_email}', businessData.business_email)
+      .replace(/{business_name}/g, businessData.business_name)
+      .replace(/{business_phone}/g, businessData.business_phone)
+      .replace(/{business_address}/g, businessData.business_address)
+      .replace(/{business_email}/g, businessData.business_email)
 
     // Add multilingual instructions
     if (include_multilingual_instructions) {

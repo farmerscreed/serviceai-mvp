@@ -599,6 +599,44 @@ export class SMSWorkflowEngine {
   }
 
   // =====================================================
+  // Convenience Methods
+  // =====================================================
+
+  /**
+   * Trigger appointment workflow (convenience method)
+   */
+  async triggerAppointmentWorkflow(appointment: any, language: 'en' | 'es'): Promise<void> {
+    try {
+      console.log(`🔄 Triggering appointment workflow for appointment ${appointment.id}`)
+      
+      // Create appointment confirmation workflow
+      const workflow = await this.createWorkflow(
+        appointment.organization_id,
+        appointment.customer_id || appointment.id, // Use appointment ID as fallback
+        'appointment_confirmation',
+        new Date().toISOString(),
+        {
+          appointmentId: appointment.id,
+          customerName: appointment.customer_name,
+          phoneNumber: appointment.customer_phone,
+          appointmentDate: appointment.scheduled_date,
+          appointmentTime: appointment.scheduled_time,
+          serviceType: appointment.appointment_type,
+          language: language
+        }
+      )
+
+      // Execute the workflow immediately
+      await this.executeWorkflow(workflow.id)
+      
+      console.log(`✅ Appointment workflow completed for ${appointment.id}`)
+    } catch (error) {
+      console.error('Error triggering appointment workflow:', error)
+      throw error
+    }
+  }
+
+  // =====================================================
   // Helper Methods
   // =====================================================
 

@@ -17,6 +17,7 @@ interface VapiClient {
     search(params: { country: string; areaCode?: string; limit?: number }): Promise<Array<{ id: string; number: string; country: string; areaCode?: string }>>
     purchase(params: { phoneNumberId: string }): Promise<{ id: string; number: string }>
     assign(params: { assistantId: string; phoneNumberId: string }): Promise<{ id: string; number: string }>
+    create(config: any): Promise<{ id: string; number: string }>
   }
 }
 
@@ -141,7 +142,7 @@ export class MultilingualVapiService {
           language: 'multi' // Enables automatic language detection
         },
         voice: voiceConfig,
-        serverUrl: webhookBaseUrl ? `${webhookBaseUrl}/api/webhooks/vapi/${organizationId}` : undefined,
+        serverUrl: webhookBaseUrl ? `${webhookBaseUrl}/api/webhooks/vapi/${organizationId}` : `https://app.serviceai.com/api/webhooks/vapi/${organizationId}`,
         firstMessage: template.template_config.greeting_template.replace(/{(\w+)}/g, (match, key) => (businessData as any)[key] || match)
       }
 
@@ -898,9 +899,10 @@ export class MultilingualVapiService {
       voice: {
         provider: 'azure',
         voiceId: 'en-US-AriaNeural', // Default English voice
-        speed: 1.0
+        speed: 1.0,
+        pitch: 1.0
       },
-      serverUrl: process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/vapi/demo` : undefined, // Dedicated webhook for demo calls
+      serverUrl: process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/vapi/demo` : 'https://app.serviceai.com/api/webhooks/vapi/demo', // Dedicated webhook for demo calls
       firstMessage: `Hello ${name}, this is your ServiceAI demo agent calling! I'm here to give you a firsthand experience of how our AI phone assistant can help your ${industry || 'business'}.`
     }
   }
@@ -963,17 +965,6 @@ export class MultilingualVapiService {
         }
       },
       phoneNumbers: {
-        create: async (config: any) => {
-          console.log('📞 Creating new phone number with config:', config)
-          try {
-            const phoneNumber = await directClient.createPhoneNumber(config)
-            console.log('✅ Phone number created:', phoneNumber.sipUri || phoneNumber.number || phoneNumber.id)
-            return phoneNumber
-          } catch (error: any) {
-            console.error('❌ Failed to create phone number:', error)
-            throw error
-          }
-        },
         search: async ({ country = 'US', areaCode = '555' }) => {
           console.log('📞 Searching phone numbers:', { country, areaCode })
           const phoneNumbers = await directClient.listPhoneNumbers()

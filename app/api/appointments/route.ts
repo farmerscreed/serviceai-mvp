@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by status if provided
     if (status && status !== 'all') {
-      query = query.eq('status', status)
+      query = query.eq('status', status as any)
     }
 
     const { data: appointments, error: apptError } = await query
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to match frontend interface
-    const transformedAppointments = (appointments || []).map(apt => ({
+    const transformedAppointments = (appointments || []).map((apt: any) => ({
       id: apt.id,
       customerName: apt.customer_name,
       customerPhone: apt.customer_phone,
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
         language_preference: languagePreference,
         status: 'pending',
         notes: notes
-      })
+      } as any)
       .select()
       .single()
 

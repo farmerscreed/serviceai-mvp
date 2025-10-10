@@ -1,9 +1,31 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -48,7 +70,7 @@ export async function GET() {
   // Flatten the organization name
   const formattedCallLogs = callLogs.map(log => ({
     ...log,
-    organization_name: log.organizations?.name || 'N/A',
+    organization_name: Array.isArray(log.organizations) ? log.organizations[0]?.name || 'N/A' : log.organizations?.name || 'N/A',
   }))
 
   return NextResponse.json(formattedCallLogs)
