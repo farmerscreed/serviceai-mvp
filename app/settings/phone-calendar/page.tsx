@@ -66,11 +66,26 @@ export default function PhoneCalendarSettingsPage() {
   const handleConnectGoogleCalendar = async () => {
     setConnecting(true)
     try {
-      // TODO: Implement Google OAuth flow
-      alert('Google Calendar connection will be implemented soon!')
-      // This would redirect to Google OAuth, then callback to /api/calendar/google/callback
-    } catch (error) {
-      console.error('Error connecting calendar:', error)
+      if (!currentOrganization) {
+        alert('Please select an organization first.')
+        return
+      }
+
+      const response = await fetch(`/api/calendar/google/auth?organizationId=${currentOrganization.organization_id}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get Google OAuth URL')
+      }
+
+      if (data.authUrl) {
+        window.location.href = data.authUrl
+      } else {
+        throw new Error('Google OAuth URL not found in response.')
+      }
+    } catch (error: any) {
+      console.error('Error connecting Google Calendar:', error)
+      alert(`Error connecting Google Calendar: ${error.message}`)
     } finally {
       setConnecting(false)
     }
@@ -81,16 +96,27 @@ export default function PhoneCalendarSettingsPage() {
       return
     }
 
+    if (!currentOrganization) {
+      alert('No organization selected.')
+      return
+    }
+
     try {
       const response = await fetch('/api/calendar/disconnect', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: currentOrganization.organization_id }),
       })
       
       if (response.ok) {
         await loadSettings()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to disconnect calendar')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error disconnecting calendar:', error)
+      alert(`Error disconnecting calendar: ${error.message}`)
     }
   }
 

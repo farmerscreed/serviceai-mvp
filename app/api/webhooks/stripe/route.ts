@@ -110,6 +110,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return
   }
 
+  // Check if this is a minute bundle purchase
+  if (session.metadata?.bundle_id) {
+    await handleCheckoutSessionCompletedForMinutes(session)
+    return
+  }
+
   // Update organization with subscription info
   if (session.subscription) {
     const subscriptionId = typeof session.subscription === 'string'
@@ -127,6 +133,40 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     if (error) {
       console.error('Error updating organization:', error)
     }
+  }
+}
+
+async function handleCheckoutSessionCompletedForMinutes(session: Stripe.Checkout.Session) {
+  const organizationId = session.metadata?.organization_id
+  const minutes = parseInt(session.metadata?.minutes as string)
+
+  if (!organizationId || isNaN(minutes)) {
+    console.error('Missing organization_id or minutes in checkout session metadata for minute purchase')
+    return
+  }
+
+  // Fetch current credit_minutes
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizations')
+    .select('credit_minutes')
+    .eq('id', organizationId)
+    .single()
+
+  if (orgError || !org) {
+    console.error('Error fetching organization for minute purchase:', orgError?.message)
+    return
+  }
+
+  // Update organization's credit_minutes
+  const { error } = await supabaseAdmin
+    .from('organizations')
+    .update({ credit_minutes: (org.credit_minutes || 0) + minutes })
+    .eq('id', organizationId)
+
+  if (error) {
+    console.error('Error updating credit_minutes for organization:', error)
+  } else {
+    console.log(`✅ Added ${minutes} credit minutes to organization ${organizationId}`)
   }
 }
 
@@ -227,6 +267,18 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!org) {
     console.error('Organization not found for customer:', customerId)
     return
+  }
+
+  // If this is a subscription renewal, reset usage
+  if (invoice.billing_reason === 'subscription_cycle') {
+    const { error: updateError } = await supabaseAdmin
+      .from('organizations')
+      .update({ minutes_used_this_cycle: 0 })
+      .eq('id', org.id)
+
+    if (updateError) {
+      console.error('Error resetting usage for organization:', updateError)
+    }
   }
 
   // Record payment in payment_history

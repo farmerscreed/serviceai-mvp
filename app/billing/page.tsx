@@ -16,11 +16,25 @@ interface BillingInfo {
 }
 
 interface UsageStats {
-  event_type: string
-  usage_count: number
-  limit_count: number
-  percentage: number
+  organizationId: string
+  organizationName: string
+  monthlyMinutesAllocation: number
+  minutesUsedThisCycle: number
+  creditMinutes: number
+  remainingMinutes: number
 }
+
+interface MinuteBundle {
+  id: string
+  minutes: number
+  price: number
+}
+
+const MINUTE_BUNDLES: MinuteBundle[] = [
+  { id: 'bundle_100', minutes: 100, price: 10.00 },
+  { id: 'bundle_500', minutes: 500, price: 45.00 },
+  { id: 'bundle_1000', minutes: 1000, price: 80.00 },
+]
 
 export default function BillingPage() {
   const { user } = useAuth()
@@ -40,7 +54,9 @@ export default function BillingPage() {
   }, [currentOrganization])
 
   const loadBillingData = async () => {
-    if (!currentOrganization) return
+    if (!currentOrganization) {
+      return
+    }
 
     try {
       // Load billing info
@@ -55,13 +71,14 @@ export default function BillingPage() {
       }
 
       // Load usage stats
-      const { data: usage } = await supabase
-        .rpc('get_current_usage', {
-          p_organization_id: currentOrganization.organization_id,
-          p_event_type: null,
-        })
+      const response = await fetch('/api/usage')
+      const usageData = await response.json()
 
-      setUsageStats(usage || [])
+      if (response.ok) {
+        setUsageStats(usageData)
+      } else {
+        console.error('Error loading usage data:', usageData.error)
+      }
     } catch (error) {
       console.error('Error loading billing data:', error)
     } finally {
@@ -70,7 +87,9 @@ export default function BillingPage() {
   }
 
   const handleOpenPortal = async () => {
-    if (!currentOrganization) return
+    if (!currentOrganization) {
+      return
+    }
 
     setOpeningPortal(true)
 
@@ -97,6 +116,36 @@ export default function BillingPage() {
     } catch (error: any) {
       alert(error.message)
       setOpeningPortal(false)
+    }
+  }
+
+  const handlePurchaseMinutes = async (bundle: MinuteBundle) => {
+    if (!currentOrganization) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/billing/purchase-minutes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: currentOrganization.organization_id,
+          bundle_id: bundle.id,
+          minutes: bundle.minutes,
+          price: bundle.price,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to purchase minutes')
+      }
+
+      alert('Minutes purchased successfully! Your balance will update shortly.')
+      loadBillingData() // Refresh data
+    } catch (error: any) {
+      alert(error.message)
     }
   }
 
@@ -218,39 +267,91 @@ export default function BillingPage() {
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-6">Current Usage</h2>
 
-          {usageStats.length === 0 ? (
+          {usageStats.monthlyMinutesAllocation === undefined ? (
             <p className="text-sm text-gray-500">No usage data available yet.</p>
           ) : (
             <div className="space-y-6">
-              {usageStats.map((stat) => (
-                <div key={stat.event_type}>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">
+                      Monthly Allocated Minutes
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {usageStats.minutesUsedThisCycle} / {usageStats.monthlyMinutesAllocation} minutes
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {usageStats.minutesUsedThisCycle > 0
+                      ? ((usageStats.minutesUsedThisCycle / usageStats.monthlyMinutesAllocation) * 100).toFixed(0)
+                      : 0}% 
+                  </div>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${
+                      (usageStats.minutesUsedThisCycle / usageStats.monthlyMinutesAllocation) * 100 >= 95
+                        ? 'bg-red-600'
+                        : (usageStats.minutesUsedThisCycle / usageStats.monthlyMinutesAllocation) * 100 >= 80
+                        ? 'bg-yellow-600'
+                        : 'bg-green-600'
+                    }`}
+                    style={{ width: `${Math.min((usageStats.minutesUsedThisCycle / usageStats.monthlyMinutesAllocation) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {usageStats.creditMinutes > 0 && (
+                <div>
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <div className="text-sm font-medium text-gray-700 capitalize">
-                        {stat.event_type.replace('_', ' ')}
+                      <div className="text-sm font-medium text-gray-700">
+                        Additional Purchased Minutes
                       </div>
                       <div className="text-xs text-gray-500">
-                        {stat.usage_count} / {stat.limit_count === -1 ? '∞' : stat.limit_count}
+                        {usageStats.creditMinutes} minutes remaining
                       </div>
                     </div>
                     <div className="text-sm font-semibold text-gray-900">
-                      {stat.limit_count === -1 ? '0' : stat.percentage.toFixed(0)}%
+                      {usageStats.creditMinutes}
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full ${
-                        stat.percentage >= 95
-                          ? 'bg-red-600'
-                          : stat.percentage >= 80
-                          ? 'bg-yellow-600'
-                          : 'bg-green-600'
-                      }`}
-                      style={{ width: `${Math.min(stat.percentage, 100)}%` }}
+                      className="h-2 rounded-full bg-blue-600"
+                      style={{ width: '100%' }}
                     />
                   </div>
                 </div>
-              ))}
+              )}
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">
+                      Total Remaining Minutes
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {usageStats.remainingMinutes} minutes
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {usageStats.remainingMinutes}
+                  </div>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${
+                      usageStats.remainingMinutes <= 0
+                        ? 'bg-red-600'
+                        : usageStats.remainingMinutes < (usageStats.monthlyMinutesAllocation * 0.2)
+                        ? 'bg-yellow-600'
+                        : 'bg-green-600'
+                    }`}
+                    style={{ width: `${Math.min((usageStats.remainingMinutes / (usageStats.monthlyMinutesAllocation + usageStats.creditMinutes)) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -284,6 +385,27 @@ export default function BillingPage() {
             <p className="text-sm text-gray-600">View detailed usage analytics</p>
           </Link>
         </div>
+
+        {/* Buy More Minutes */}
+        {canManageBilling && (
+          <div className="bg-white shadow rounded-lg p-6 mt-8">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Buy More Minutes</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {MINUTE_BUNDLES.map((bundle) => (
+                <div key={bundle.id} className="border border-gray-200 rounded-lg p-4 text-center">
+                  <h3 className="text-xl font-semibold text-gray-900">{bundle.minutes} Minutes</h3>
+                  <p className="text-gray-600 mt-1">${bundle.price.toFixed(2)}</p>
+                  <button
+                    onClick={() => handlePurchaseMinutes(bundle)}
+                    className="mt-4 w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Buy Now
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

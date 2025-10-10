@@ -216,45 +216,117 @@ Assistant Name: "Sarah - HVAC Assistant"
 
 ---
 
+### 9.3 Billing & Usage Management Flow
+
+#### 9.3.1 Usage Tracking & Hard Cut-off
+**Test Steps:**
+1. Create a test organization with a subscription plan (e.g., Starter with 100 minutes).
+2. Make calls that consume minutes up to the allocated limit.
+3. Verify `minutes_used_this_cycle` is updated correctly after each call.
+4. Attempt to make a call when `minutes_used_this_cycle` equals `monthly_minutes_allocation`.
+5. Verify the call is terminated with the "insufficient minutes" message.
+6. Change subscription status to 'canceled' or 'past_due'.
+7. Attempt to make a call.
+8. Verify the call is terminated with the "subscription inactive" message.
+9. Advance the billing cycle (simulate Stripe webhook for `customer.subscription.updated` with `invoice.paid` event for renewal).
+10. Verify `minutes_used_this_cycle` is reset to 0.
+**Expected Results:**
+- ✅ `minutes_used_this_cycle` accurately reflects call duration.
+- ✅ Calls are correctly blocked when minutes are exhausted or subscription is inactive.
+- ✅ Appropriate messages are played for blocked calls.
+- ✅ `minutes_used_this_cycle` resets at the start of a new billing cycle.
+
+#### 9.3.2 Buy More Minutes
+**Test Steps:**
+1. Navigate to the billing page.
+2. Select a minute bundle and click "Buy Now".
+3. Complete the Stripe Checkout process.
+4. Verify `credit_minutes` is updated correctly after successful payment.
+5. Attempt to make calls using `credit_minutes`.
+6. Verify `credit_minutes` are consumed correctly.
+**Expected Results:**
+- ✅ Stripe Checkout flow works seamlessly.
+- ✅ `credit_minutes` are accurately added to the organization's balance.
+- ✅ Calls are successfully made using `credit_minutes`.
+
+#### 9.3.3 Usage Notifications
+**Test Steps:**
+1. Configure an organization's usage to be near a threshold (e.g., 75% used).
+2. Manually trigger the `check-usage-notifications` Edge Function.
+3. Verify an email notification is sent to the organization owner.
+4. Configure an organization's usage to be 100% used.
+5. Manually trigger the `check-usage-notifications` Edge Function.
+6. Verify an email notification for exhausted minutes is sent.
+**Expected Results:**
+- ✅ Email notifications are sent at the correct usage thresholds.
+- ✅ Email content is accurate and informative.
+
+### 9.4 Admin Dashboard Flow
+
+#### 9.4.1 Admin Access Control
+**Test Steps:**
+1. Log in as a `member` user.
+2. Attempt to navigate to `/admin`.
+3. Verify redirection to `/dashboard`.
+4. Log in as an `admin` user.
+5. Navigate to `/admin`.
+6. Verify access to the Admin Dashboard.
+**Expected Results:**
+- ✅ Only `owner` and `admin` roles can access the Admin Dashboard.
+- ✅ Unauthorized users are correctly redirected.
+
+#### 9.4.2 Organizations Management
+**Test Steps:**
+1. Navigate to the Admin Dashboard -> Organizations section.
+2. Verify all organizations are listed with correct subscription and usage data.
+3. Verify `minutes_used_this_cycle`, `credit_minutes`, `monthlyMinutesAllocation`, and `remainingMinutes` are displayed accurately.
+**Expected Results:**
+- ✅ All organizations are visible.
+- ✅ Usage data is accurate and up-to-date.
+
+#### 9.4.3 Call Logs View
+**Test Steps:**
+1. Navigate to the Admin Dashboard -> Call Logs section.
+2. Verify all call logs are listed with correct details (organization name, duration, cost, etc.).
+3. Make a new call and verify it appears in the logs.
+**Expected Results:**
+- ✅ All call logs are displayed.
+- ✅ New calls appear in the logs in near real-time.
+
+#### 9.4.4 System Settings Management
+**Test Steps:**
+1. Navigate to the Admin Dashboard -> Settings section.
+2. Verify `overage_markup_percentage` is displayed.
+3. Update `overage_markup_percentage` to a new value.
+4. Save changes.
+5. Verify the new value persists after refresh.
+**Expected Results:**
+- ✅ System settings are correctly displayed.
+- ✅ Settings can be updated and persist.
+
+---
+
 ### 5. 📅 CALENDAR INTEGRATION FLOW
 
 #### 5.1 Calendar Setup
 **Test Steps:**
-1. Navigate to calendar settings
+1. Navigate to calendar settings.
 2. Connect Google Calendar:
-   - OAuth flow
-   - Permission grants
-   - Calendar selection
-3. Test calendar sync
-4. Verify events appear
-5. Test appointment creation
-
+   - Initiate OAuth flow by clicking "Connect Google Calendar".
+   - Complete Google authentication and permission grants.
+   - Verify successful connection and calendar details (email, provider) are displayed.
+3. Test calendar sync (e.g., create an appointment via AI assistant).
+4. Verify events appear in Google Calendar.
+5. Disconnect Google Calendar.
+6. Verify calendar is disconnected and UI reflects this.
+7. Test appointment creation after disconnection (should not sync).
 **Expected Results:**
-- ✅ OAuth flow completes successfully
-- ✅ Calendar permissions granted
-- ✅ Sync works correctly
-- ✅ Events visible in system
-- ✅ Appointments create calendar events
-
-#### 5.2 Appointment Management
-**Test Steps:**
-1. Navigate to `/appointments`
-2. Create new appointment:
-   - Customer details
-   - Service type
-   - Date and time
-   - Location
-3. Save appointment
-4. Verify calendar event created
-5. Test appointment updates
-6. Test appointment cancellation
-
-**Expected Results:**
-- ✅ Appointment form works correctly
-- ✅ Validation prevents invalid dates
-- ✅ Calendar events created automatically
-- ✅ Updates sync to calendar
-- ✅ Cancellations handled properly
+- ✅ OAuth flow completes successfully.
+- ✅ Calendar permissions granted and stored.
+- ✅ Calendar details (email, provider) are correctly displayed.
+- ✅ Sync works correctly (events created/updated/deleted).
+- ✅ Events visible in system and Google Calendar.
+- ✅ Disconnection works, and data is removed.
 
 ---
 

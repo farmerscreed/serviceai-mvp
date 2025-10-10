@@ -1,4 +1,15 @@
 import Link from 'next/link'
+import DemoCallForm from '@/components/DemoCallForm' // Import DemoCallForm
+
+// Hardcode industries for the demo form
+const INDUSTRIES = [
+  { code: 'hvac', name: 'HVAC' },
+  { code: 'plumbing', name: 'Plumbing' },
+  { code: 'electrical', name: 'Electrical' },
+  { code: 'medical', name: 'Medical' },
+  { code: 'veterinary', name: 'Veterinary' },
+  { code: 'property', name: 'Property Management' },
+]
 
 export default function HomePage() {
   return (
@@ -61,6 +72,9 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+
+        {/* Demo Call Section */}
+        <DemoCallForm industries={INDUSTRIES} />
 
         <div id="features" className="mt-24">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">

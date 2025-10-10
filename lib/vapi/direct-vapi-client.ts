@@ -220,7 +220,7 @@ export class DirectVapiClient {
    * Based on: https://docs.vapi.ai/api-reference/phone-numbers/create
    */
   async createPhoneNumber(config: {
-    provider?: 'twilio' | 'vonage'
+    provider?: 'vapi' | 'twilio' | 'vonage' | 'telnyx'
     fallbackDestination?: {
       type: 'number'
       number: string
@@ -244,11 +244,20 @@ export class DirectVapiClient {
       if (!response.ok) {
         const errorText = await response.text()
         console.error('❌ Vapi API error:', errorText)
+        console.error('❌ Response status:', response.status)
+        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()))
         throw new Error(`Vapi API error (${response.status}): ${errorText}`)
       }
 
       const phoneNumber = await response.json()
-      console.log('✅ Phone number created:', phoneNumber.number)
+      console.log('✅ Phone number created:', phoneNumber.sipUri || phoneNumber.number || phoneNumber.id)
+      console.log('📞 Full phone number response:', JSON.stringify(phoneNumber, null, 2))
+      
+      // Validate that we have a phone number (Vapi SIP numbers use sipUri, others use number)
+      if (!phoneNumber.sipUri && !phoneNumber.number && !phoneNumber.phone && !phoneNumber.id) {
+        console.error('❌ No phone number found in response:', phoneNumber)
+        throw new Error('Phone number not found in Vapi response')
+      }
       
       return phoneNumber
     } catch (error) {
@@ -355,6 +364,58 @@ export class DirectVapiClient {
       return phoneNumber
     } catch (error) {
       console.error('❌ Error importing Twilio phone number:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Create an outbound call
+   * Based on: https://docs.vapi.ai/api-reference/outbound-call/create
+   */
+  async createOutboundCall(config: {
+    assistantId: string
+    phoneNumberId?: string
+    customer: {
+      number: string
+      name?: string
+    }
+    metadata?: { [key: string]: any }
+    // Add other relevant outbound call parameters as needed
+  }): Promise<any> {
+    try {
+      console.log('📞 Initiating outbound call...')
+      
+      const response = await fetch(`${this.baseUrl}/outbound-call`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          ...config,
+          voicemailDetection: {
+            provider: 'google', // Use Google's voicemail detection
+            maxAwaitSeconds: 30, // Wait up to 30 seconds for a beep
+          },
+          artifactPlan: {
+            recordingEnabled: true, // Enable call recording
+            recordingFormat: 'mp3', // Store recordings as MP3
+            transcriptPlan: {
+              enabled: true, // Enable transcript generation
+            },
+          },
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Vapi API error:', errorText)
+        throw new Error(`Vapi API error (${response.status}): ${errorText}`)
+      }
+
+      const outboundCall = await response.json()
+      console.log('✅ Outbound call created:', outboundCall.id)
+      
+      return outboundCall
+    } catch (error) {
+      console.error('❌ Error creating outbound call:', error)
       throw error
     }
   }
