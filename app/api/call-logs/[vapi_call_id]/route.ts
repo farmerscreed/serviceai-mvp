@@ -14,8 +14,6 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { vapi_call_id } = params;
-
     if (!vapi_call_id) {
       return NextResponse.json({ error: 'vapi_call_id is required' }, { status: 400 });
     }
