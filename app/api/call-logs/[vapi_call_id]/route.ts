@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 
+interface GetContext {
+  params: {
+    vapi_call_id: string;
+  };
+}
+
 export async function GET(
   request: NextRequest,
-  context: { params: { vapi_call_id: string } }
+  context: GetContext
 ) {
   const { vapi_call_id } = context.params;
   try {
