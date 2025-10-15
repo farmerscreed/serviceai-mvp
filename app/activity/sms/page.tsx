@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, MessageSquare, Search, Filter } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import SMSHistory from '@/app/sms/history/page'
+import SMSTemplates from '@/app/sms/templates/page'
 import { useOrganization } from '@/lib/organizations/organization-context'
 import { LoadingList, EmptyMessages } from '@/components/ui/LoadingStates'
 import { Card } from '@/components/ui/Card'
@@ -103,49 +106,18 @@ export default function SMSPage() {
           </div>
         </Card>
 
-        {loading ? (
-          <LoadingList count={5} showIcons={true} />
-        ) : filteredMessages.length === 0 ? (
-          <EmptyMessages />
-        ) : (
-          <div className="space-y-4">
-            {filteredMessages.map((msg) => (
-              <Card key={msg.id} padding="md" hoverable>
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-semibold text-gray-900">{msg.phone_number}</span>
-                      <Badge 
-                        variant={msg.status === 'delivered' ? 'success' : msg.status === 'failed' ? 'danger' : 'warning'}
-                        size="sm"
-                      >
-                        {msg.status}
-                      </Badge>
-                      <Badge variant="outline" size="sm">
-                        {msg.language_code.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-2">{msg.message_content}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>Type: {msg.message_type}</span>
-                      <span>•</span>
-                      <span>Sent: {new Date(msg.created_at).toLocaleString()}</span>
-                      {msg.delivered_at && (
-                        <>
-                          <span>•</span>
-                          <span>Delivered: {new Date(msg.delivered_at).toLocaleString()}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+        <Tabs defaultValue="history" className="mt-6">
+          <TabsList>
+            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+          </TabsList>
+          <TabsContent value="history">
+            <SMSHistory />
+          </TabsContent>
+          <TabsContent value="templates">
+            <SMSTemplates />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

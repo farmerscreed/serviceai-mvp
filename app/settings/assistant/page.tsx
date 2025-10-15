@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth/auth-context'
 import { useOrganization } from '@/lib/organizations/organization-context'
-import { useToast } from '@/components/ui/Toast'
+import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -33,6 +33,12 @@ interface Assistant {
 }
 
 export default function AssistantSettingsPage() {
+  // Redirect to unified assistants page
+  if (typeof window !== 'undefined') {
+    // client-side redirect for existing bookmarks/navigation
+    window.location.replace('/assistants')
+    return null
+  }
   const { user } = useAuth()
   const { currentOrganization } = useOrganization()
   const router = useRouter()

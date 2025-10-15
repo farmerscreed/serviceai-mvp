@@ -216,53 +216,78 @@ export class DirectVapiClient {
   }
 
   /**
-   * Create/Buy a new phone number
+   * Create/Buy a new phone number and poll until it's provisioned.
    * Based on: https://docs.vapi.ai/api-reference/phone-numbers/create
    */
   async createPhoneNumber(config: {
-    provider?: 'vapi' | 'twilio' | 'vonage' | 'telnyx'
+    provider?: 'vapi' | 'twilio' | 'vonage' | 'telnyx';
     fallbackDestination?: {
-      type: 'number'
-      number: string
-      message?: string
-    }
-    name?: string
-    assistantId?: string
-    squadId?: string
-    serverUrl?: string
-    serverUrlSecret?: string
+      type: 'number';
+      number: string;
+      message?: string;
+    };
+    name?: string;
+    assistantId?: string;
+    squadId?: string;
+    serverUrl?: string;
+    serverUrlSecret?: string;
   }): Promise<any> {
     try {
-      console.log('📞 Creating/buying phone number...')
+      console.log('📞 Creating/buying phone number...');
       
       const response = await fetch(`${this.baseUrl}/phone-number`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(config)
-      })
+      });
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Vapi API error:', errorText)
-        console.error('❌ Response status:', response.status)
-        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()))
-        throw new Error(`Vapi API error (${response.status}): ${errorText}`)
+        const errorText = await response.text();
+        console.error('❌ Vapi API error:', errorText);
+        console.error('❌ Response status:', response.status);
+        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
+        throw new Error(`Vapi API error (${response.status}): ${errorText}`);
       }
 
-      const phoneNumber = await response.json()
-      console.log('✅ Phone number created:', phoneNumber.sipUri || phoneNumber.number || phoneNumber.id)
-      console.log('📞 Full phone number response:', JSON.stringify(phoneNumber, null, 2))
-      
-      // Validate that we have a phone number (Vapi SIP numbers use sipUri, others use number)
-      if (!phoneNumber.sipUri && !phoneNumber.number && !phoneNumber.phone && !phoneNumber.id) {
-        console.error('❌ No phone number found in response:', phoneNumber)
-        throw new Error('Phone number not found in Vapi response')
+      let phoneNumber = await response.json();
+      console.log('✅ Phone number object created:', phoneNumber.id);
+      console.log('📞 Initial phone number response:', JSON.stringify(phoneNumber, null, 2));
+
+      // Poll for the phone number if it's not immediately available
+      if (!phoneNumber.number && !phoneNumber.sipUri) {
+        console.log('⏳ Phone number not immediately available. Starting polling...');
+        const maxRetries = 12; // 12 retries * 15 seconds = 3 minutes
+        const retryInterval = 15000; // 15 seconds
+
+        for (let i = 0; i < maxRetries; i++) {
+          await new Promise(resolve => setTimeout(resolve, retryInterval));
+          console.log(` polling attempt ${i + 1}/${maxRetries}...`);
+          
+          try {
+            const updatedPhoneNumber = await this.getPhoneNumber(phoneNumber.id);
+            if (updatedPhoneNumber.number || updatedPhoneNumber.sipUri) {
+              console.log('✅ Phone number provisioned:', updatedPhoneNumber.number || updatedPhoneNumber.sipUri);
+              phoneNumber = updatedPhoneNumber;
+              break;
+            }
+          } catch (pollError) {
+            console.warn(' Polling attempt failed:', pollError);
+          }
+        }
       }
       
-      return phoneNumber
+      // Final validation
+      if (!phoneNumber.number && !phoneNumber.sipUri) {
+        console.error('❌ Failed to provision phone number after polling:', phoneNumber);
+        throw new Error('Failed to provision phone number from Vapi after 3 minutes.');
+      }
+      
+      console.log('✅ Phone number fully provisioned:', phoneNumber.sipUri || phoneNumber.number || phoneNumber.id);
+      return phoneNumber;
+
     } catch (error) {
-      console.error('❌ Error creating phone number:', error)
-      throw error
+      console.error('❌ Error creating phone number:', error);
+      throw error;
     }
   }
 

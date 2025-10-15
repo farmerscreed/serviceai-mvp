@@ -53,7 +53,9 @@ export async function POST(request: NextRequest) {
       timezone: 'America/New_York', // TODO: Get from organization settings
       emergency_contact_phone: '', // TODO: Add emergency contact to onboarding
       emergency_contact_email: '', // TODO: Add emergency email to onboarding
-      sms_enabled: true
+      sms_enabled: true,
+      email_notifications: true,
+      industry_specific: {}
     }
 
     // Create multilingual assistant using the VAPI service

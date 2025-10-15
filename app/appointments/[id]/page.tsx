@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizations/organization-context'
-import { useToast } from '@/components/ui/Toast'
+import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import {
   ArrowLeft,
@@ -68,11 +68,12 @@ export default function AppointmentDetailPage() {
   const id = (params as any)?.id as string
   const { currentOrganization } = useOrganization()
   const router = useRouter()
-  const toast = useToast()
+  const { toast } = useToast()
   const { confirm } = useConfirm()
 
   const [appointment, setAppointment] = useState<Appointment | null>(null)
   const [smsLogs, setSmsLogs] = useState<SMSLog[]>([])
+  const [callSummary, setCallSummary] = useState<CallLogSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -83,6 +84,20 @@ export default function AppointmentDetailPage() {
     }
   }, [id])
 
+  useEffect(() => {
+    if (appointment?.vapi_call_id) {
+      loadCallSummary(appointment.vapi_call_id)
+    }
+  }, [appointment?.vapi_call_id])
+
+  interface CallLogSummary {
+    id: string;
+    summary: string;
+    duration_seconds: number;
+    transcript: string;
+    created_at: string;
+  }
+
   const loadAppointment = async () => {
     try {
       const response = await fetch(`/api/appointments/${id}`, { credentials: 'same-origin' })
@@ -91,16 +106,16 @@ export default function AppointmentDetailPage() {
         if (result.success) {
           setAppointment(result.appointment)
         } else {
-          toast.error(result.error || 'Failed to load appointment')
+          toast({ title: 'Error', description: result.error || 'Failed to load appointment' })
           router.push('/appointments')
         }
       } else {
-        toast.error('Failed to load appointment')
+        toast({ title: 'Error', description: 'Failed to load appointment' })
         router.push('/appointments')
       }
     } catch (error) {
       console.error('Error loading appointment:', error)
-      toast.error('Error loading appointment')
+      toast({ title: 'Error', description: 'Error loading appointment' })
       router.push('/appointments')
     } finally {
       setLoading(false)
@@ -110,14 +125,48 @@ export default function AppointmentDetailPage() {
   const loadSMSLogs = async () => {
     try {
       const response = await fetch(`/api/appointments/${id}/sms`, { credentials: 'same-origin' })
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success) {
-          setSmsLogs(result.smsLogs || [])
-        }
+      if (!response.ok) {
+        let message = 'Failed to load SMS history'
+        try {
+          const contentType = response.headers.get('content-type') || ''
+          if (contentType.includes('application/json')) {
+            const data = await response.json()
+            message = data.error || message
+          }
+        } catch {}
+        toast({ title: 'Error', description: message })
+        return
+      }
+      const result = await response.json()
+      if (result.success) {
+        setSmsLogs(result.smsLogs || [])
       }
     } catch (error) {
       console.error('Error loading SMS logs:', error)
+    }
+  }
+
+  const loadCallSummary = async (vapiCallId: string) => {
+    try {
+      const response = await fetch(`/api/call-logs/${vapiCallId}`, { credentials: 'same-origin' })
+      if (!response.ok) {
+        let message = 'Failed to load call summary'
+        try {
+          const contentType = response.headers.get('content-type') || ''
+          if (contentType.includes('application/json')) {
+            const data = await response.json()
+            message = data.error || message
+          }
+        } catch {}
+        toast({ title: 'Error', description: message })
+        return
+      }
+      const result = await response.json()
+      if (result.success) {
+        setCallSummary(result.callLog)
+      }
+    } catch (error) {
+      console.error('Error loading call summary:', error)
     }
   }
 
@@ -195,14 +244,14 @@ export default function AppointmentDetailPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        toast.success(`Appointment ${statusMessages[newStatus as keyof typeof statusMessages]} successfully`)
+        toast({ title: 'Success', description: `Appointment ${statusMessages[newStatus as keyof typeof statusMessages]} successfully` })
         await loadAppointment()
       } else {
-        toast.error(result.error || 'Failed to update appointment')
+        toast({ title: 'Error', description: result.error || 'Failed to update appointment' })
       }
     } catch (error) {
       console.error('Error updating appointment:', error)
-      toast.error('Error updating appointment')
+      toast({ title: 'Error', description: 'Error updating appointment' })
     } finally {
       setActionLoading(null)
     }
@@ -405,6 +454,33 @@ export default function AppointmentDetailPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Call Summary */}
+            {callSummary && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Phone className="w-5 h-5" />
+                  Call Summary
+                </h2>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-gray-500">Summary</p>
+                    <p className="font-medium text-gray-900">{callSummary.summary}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Duration</p>
+                    <p className="font-medium text-gray-900">{callSummary.duration_seconds} seconds</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Transcript</p>
+                    <div className="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto">
+                      <p className="text-gray-900 whitespace-pre-wrap">{callSummary.transcript}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">Call started: {formatRelativeTime(callSummary.created_at)}</p>
                 </div>
               </div>
             )}

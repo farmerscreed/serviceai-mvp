@@ -153,27 +153,38 @@ export function validateVapiWebhookPayload(payload: any): boolean {
       return false
     }
 
-    if (!payload.type || typeof payload.type !== 'string') {
+    // VAPI can send webhooks in two formats:
+    // 1. Wrapped format: { message: { type: "...", ... } }
+    // 2. Direct format: { type: "...", ... }
+    const eventType = payload.message?.type || payload.type
+
+    if (!eventType || typeof eventType !== 'string') {
       console.error('Webhook validation failed: Missing or invalid type field')
+      console.error('Payload structure:', JSON.stringify({ hasMessage: !!payload.message, hasType: !!payload.type, messageType: payload.message?.type, rootType: payload.type }))
       return false
     }
 
     // Validate webhook type is from our expected list
     const validWebhookTypes = [
       'assistant-request',
-      'tool-calls', 
+      'tool-calls',
       'language-detected',
       'call-started',
       'call-ended',
-      'transcript-updated'
+      'end-of-call-report',
+      'transcript-updated',
+      'speech-update',
+      'status-update',
+      'hang',
+      'function-call'
     ]
 
-    if (!validWebhookTypes.includes(payload.type)) {
-      console.error(`Webhook validation failed: Invalid webhook type: ${payload.type}`)
+    if (!validWebhookTypes.includes(eventType)) {
+      console.error(`Webhook validation failed: Invalid webhook type: ${eventType}`)
       return false
     }
 
-    console.log(`✅ Webhook payload validation passed for type: ${payload.type}`)
+    console.log(`✅ Webhook payload validation passed for type: ${eventType}`)
     return true
 
   } catch (error) {

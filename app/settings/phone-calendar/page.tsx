@@ -42,8 +42,12 @@ export default function PhoneCalendarSettingsPage() {
       if (assistantsRes.ok) {
         const data = await assistantsRes.json()
         if (data.assistants?.length > 0) {
-          setPhoneNumber(data.assistants[0].phone_number)
-          setPhoneProvider('Vapi') // or detect from metadata
+          const firstAssistant = data.assistants[0]
+          // Use direct fields from vapi_assistants table (not nested array)
+          if (firstAssistant.vapi_phone_number) {
+            setPhoneNumber(firstAssistant.vapi_phone_number)
+            setPhoneProvider(firstAssistant.phone_provider || 'vapi')
+          }
         }
       }
 

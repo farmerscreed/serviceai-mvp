@@ -4,21 +4,24 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth/auth-context'
 import { useOrganization } from '@/lib/organizations/organization-context'
 import Link from 'next/link'
-import {
+import { 
+  User, 
+  Building2, 
+  Phone, 
+  Calendar, 
+  ShieldCheck, 
+  Users, 
+  CreditCard, 
+  BellRing, 
+  MessageSquare, 
   Bot,
-  Phone,
-  Calendar,
   AlertCircle,
-  Users,
-  CreditCard,
-  Building2,
-  ChevronRight,
   CheckCircle,
   XCircle,
   Clock,
+  ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
 interface SettingCard {
   id: string
   title: string
@@ -80,7 +83,7 @@ export default function SettingsPage() {
       title: 'My AI Assistant',
       description: 'Configure your AI phone assistant, test calls, and manage settings',
       icon: Bot,
-      href: '/settings/assistant',
+      href: '/assistants',
       status: assistantStatus,
       statusText: assistantStatus === 'complete' ? 'Active' : 'Not configured',
     },
@@ -122,6 +125,13 @@ export default function SettingsPage() {
       description: 'Update your business information and preferences',
       icon: Building2,
       href: '/settings/organization',
+    },
+    {
+      id: 'sms-settings',
+      title: 'SMS Settings',
+      description: 'Configure providers and messaging preferences',
+      icon: MessageSquare,
+      href: '/settings/sms',
     },
   ]
 
@@ -165,7 +175,7 @@ export default function SettingsPage() {
               <div className="flex flex-wrap gap-2">
                 {assistantStatus === 'incomplete' && (
                   <Link
-                    href="/settings/assistant"
+                    href="/assistants"
                     className="text-xs font-medium text-blue-600 hover:text-blue-700 underline"
                   >
                     Configure Assistant

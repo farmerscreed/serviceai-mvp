@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch emergency notifications
-    const { data: alerts, error: alertsError } = await supabase
+    const { data: alerts, error: alertsError } = await (supabase as any)
       .from('emergency_notifications')
       .select('*')
       .in('organization_id', orgIds)

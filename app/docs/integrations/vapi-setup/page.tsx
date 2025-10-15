@@ -210,7 +210,7 @@ export default function VapiSetupPage() {
                 Need help? Check out our troubleshooting guide or contact support.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/settings/assistant">
+                <Link href="/assistants">
                   <Button variant="primary" size="lg">
                     Configure Assistant
                   </Button>

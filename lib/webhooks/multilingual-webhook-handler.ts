@@ -1,7 +1,7 @@
 // Multilingual Webhook Handler - Task 2.3
 // Processes Vapi.ai webhook events with multi-language support and SMS integration
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 import { createEmergencyDetectorFromTemplate } from '@/lib/emergency/multilingual-emergency-detector'
 import { ToolCallHandlers } from './tool-call-handlers'
 import { LanguageContext } from './language-context'
@@ -11,14 +11,65 @@ import { logger, ErrorUtils, ERROR_CODES, type ErrorContext } from '@/lib/utils/
 import type { CallData, CallContext } from '@/lib/emergency/multilingual-emergency-detector'
 
 export interface VapiWebhookData {
-  type: string
+  message?: {
+    type: string
+    call?: {
+      id: string
+      status: string
+      duration?: number
+      summary?: string
+      cost?: number
+    }
+    toolCallList?: Array<{
+      id: string
+      type: string
+      function: {
+        name: string
+        arguments: any
+      }
+    }>
+    toolWithToolCallList?: Array<{
+      type: string
+      function: any
+      toolCall: {
+        id: string
+        type: string
+        function: {
+          name: string
+          arguments: any
+        }
+      }
+    }>
+    transcript?: string
+    language?: string
+    customer?: {
+      name?: string
+      phone?: string
+      email?: string
+    }
+  }
+  // For backwards compatibility and non-message-wrapped events
+  type?: string
   call?: {
     id: string
     status: string
     duration?: number
+    summary?: string
+    cost?: number
+    recordingUrl?: string
+    assistantId?: string
   }
+  report?: any; // To capture the full end-of-call-report object
   toolCalls?: Array<{
     id: string
+    function: {
+      name: string
+      arguments: any
+    }
+  }>
+  toolCallList?: Array<{
+    id: string
+    type: string
     function: {
       name: string
       arguments: any
@@ -70,15 +121,20 @@ export class MultilingualWebhookHandler {
     requestHeaders?: Headers | Record<string, string>,
     rawPayload?: string
   ): Promise<WebhookResponse> {
+    // Extract event type from either message wrapper or root level
+    const eventType = webhookData.message?.type || webhookData.type || 'unknown'
+    const eventCall = webhookData.message?.call || webhookData.call
+
     const context: ErrorContext = {
       organizationId: customerId,
-      webhookType: webhookData.type,
-      callId: webhookData.call?.id,
+      webhookType: eventType,
+      callId: eventCall?.id,
       operation: 'handleWebhook'
     }
 
     try {
-      logger.info(`Processing webhook for customer ${customerId}: ${webhookData.type}`, context)
+      logger.info(`Processing webhook for customer ${customerId}: ${eventType}`, context)
+      console.log(`📥 Raw webhook data:`, JSON.stringify(webhookData, null, 2))
 
       // 1. Validate webhook payload structure
       if (!validateVapiWebhookPayload(webhookData)) {
@@ -142,25 +198,28 @@ export class MultilingualWebhookHandler {
       const detectedLanguage = await this.languageContext.detectLanguageFromEvent(webhookData)
       logger.info(`Language detected: ${detectedLanguage}`, { ...context, detectedLanguage })
 
-      // 4. Route to appropriate handler
+      // 5. Extract tool calls from either message wrapper or root level
+      const toolCalls = webhookData.message?.toolCallList || webhookData.toolCallList || webhookData.toolCalls || []
+      console.log(`🔧 Extracted ${toolCalls.length} tool calls from webhook`)
+
+      // 6. Route to appropriate handler
       let result: any
 
       // Check if it's a demo call
       if (webhookData.metadata?.demoRequestId) {
         result = await this.handleDemoCallEvent(webhookData.metadata.demoRequestId, webhookData, detectedLanguage)
       } else {
-        switch (webhookData.type) {
+        switch (eventType) {
           case 'assistant-request':
             result = await this.handleAssistantRequest(customerId, webhookData)
             break
 
           case 'tool-calls':
-
-          result = await this.handleToolCalls(customerId, webhookData.toolCalls || [], detectedLanguage)
-          break
+            result = await this.handleToolCalls(customerId, toolCalls, detectedLanguage)
+            break
 
         case 'language-detected':
-          result = await this.handleLanguageDetection(customerId, webhookData.language || 'en', webhookData.call?.id || '')
+          result = await this.handleLanguageDetection(customerId, webhookData.message?.language || webhookData.language || 'en', eventCall?.id || '')
           break
 
         case 'call-started':
@@ -171,12 +230,16 @@ export class MultilingualWebhookHandler {
           result = await this.handleCallEnded(customerId, webhookData, detectedLanguage)
           break
 
+        case 'end-of-call-report':
+          result = await this.handleEndOfCallReport(customerId, webhookData, detectedLanguage)
+          break;
+
         case 'transcript-updated':
           result = await this.handleTranscriptUpdated(customerId, webhookData, detectedLanguage)
           break
 
         default:
-          logger.warn(`Unhandled webhook type: ${webhookData.type}`, context)
+          logger.warn(`Unhandled webhook type: ${eventType}`, context)
           result = { status: 'processed', message: 'Event type not handled' }
         }
       }
@@ -205,16 +268,17 @@ export class MultilingualWebhookHandler {
 
   /**
    * Handle tool calls with language context
+   * Returns results in Vapi-expected format
    */
   async handleToolCalls(
     customerId: string,
     toolCalls: Array<{ id: string; function: { name: string; arguments: any } }>,
     language: 'en' | 'es'
-  ): Promise<ToolCallResult[]> {
+  ): Promise<any> {
     try {
       console.log(`🔧 Processing ${toolCalls.length} tool calls in ${language}`)
 
-      const results: ToolCallResult[] = []
+      const results: any[] = []
 
       for (const toolCall of toolCalls) {
         try {
@@ -223,6 +287,10 @@ export class MultilingualWebhookHandler {
           switch (toolCall.function.name) {
             case 'check_emergency_multilingual':
               result = await this.toolCallHandlers.handleEmergencyCheck(customerId, toolCall, language)
+              break
+
+            case 'check_availability':
+              result = await this.toolCallHandlers.handleAvailabilityCheck(customerId, toolCall, language)
               break
 
             case 'book_appointment_with_sms':
@@ -240,22 +308,42 @@ export class MultilingualWebhookHandler {
               }
           }
 
-          results.push(result)
+          // Format result for Vapi's expected response format
+          // VAPI expects: { toolCallId: string, result: string }
+          // The result field should contain the stringified data or error message
+          if (result.success) {
+            results.push({
+              toolCallId: toolCall.id,
+              result: JSON.stringify(result.data || {})
+            })
+          } else {
+            results.push({
+              toolCallId: toolCall.id,
+              result: JSON.stringify({ error: result.error })
+            })
+          }
+
           console.log(`✅ Tool call ${toolCall.function.name}: ${result.success ? 'success' : 'failed'}`)
+          if (!result.success) {
+            console.error(`❌ Tool call error: ${result.error}`)
+          }
 
         } catch (error) {
-          console.error(`Error processing tool call ${toolCall.function.name}:`, error)
+          console.error(`❌ Error processing tool call ${toolCall.function.name}:`, error)
           results.push({
-            success: false,
-            error: String(error)
+            toolCallId: toolCall.id,
+            result: JSON.stringify({
+              error: error instanceof Error ? error.message : String(error)
+            })
           })
         }
       }
 
+      // Return the array of results directly, as expected by Vapi.
       return results
 
     } catch (error) {
-      console.error('Error handling tool calls:', error)
+      console.error('❌ Error handling tool calls:', error)
       throw error
     }
   }
@@ -306,6 +394,7 @@ export class MultilingualWebhookHandler {
       // Log call start
       await this.logCallEvent(customerId, 'call_started', {
         callId: webhookData.call?.id,
+        phoneNumber: webhookData.call?.from || webhookData.message?.call?.from || '',
         language,
         timestamp: new Date().toISOString()
       })
@@ -333,7 +422,7 @@ export class MultilingualWebhookHandler {
     try {
       console.log(`📞 Call ended for customer ${customerId} in ${language}`)
 
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
 
       // 1. Fetch the organization's current usage
       const { data: org, error: orgError } = await supabase
@@ -381,6 +470,48 @@ export class MultilingualWebhookHandler {
     } catch (error) {
       console.error('Error handling call ended:', error)
       throw error
+    }
+  }
+
+  async handleEndOfCallReport(
+    organizationId: string,
+    webhookData: VapiWebhookData,
+    language: 'en' | 'es'
+  ): Promise<any> {
+    try {
+      console.log(`📝 Received end-of-call-report for organization ${organizationId}`);
+
+      const supabase = createServiceRoleClient();
+      const callId = webhookData.message?.call?.id;
+
+      if (!callId) {
+        throw new Error('No call ID found in end-of-call-report');
+      }
+
+      const { error } = await supabase
+        .from('call_logs')
+        .update({
+          status: 'completed',
+          transcript: webhookData.message?.transcript,
+          summary: webhookData.message?.call?.summary,
+          duration_seconds: webhookData.message?.call?.duration,
+          cost: webhookData.message?.call?.cost,
+          raw_vapi_data: webhookData, // Store the full report for future analysis
+          end_time: new Date().toISOString(),
+        })
+        .eq('vapi_call_id', callId);
+
+      if (error) {
+        console.error(`Failed to update call_log for ${callId}:`, error);
+        throw new Error(`Database error while updating call_log: ${error.message}`);
+      }
+
+      console.log(`✅ Successfully updated call_log for ${callId} with transcript and summary.`);
+
+      return { status: 'end_of_call_report_processed' };
+    } catch (error) {
+      console.error('Error handling end-of-call-report:', error);
+      throw error;
     }
   }
 
@@ -449,7 +580,7 @@ export class MultilingualWebhookHandler {
     try {
       console.log(`🔗 Processing demo call event for demo request ${demoRequestId}: ${webhookData.type}`)
 
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
 
       let updateData: any = {}
       let status: string | undefined
@@ -473,7 +604,8 @@ export class MultilingualWebhookHandler {
 
         case 'tool-calls':
           // Handle tool calls from the demo assistant (e.g., send_sms_notification)
-          const toolCallResults = await this.handleToolCalls(webhookData.customer?.id || '', webhookData.toolCalls || [], language)
+          const demoToolCalls = webhookData.message?.toolCallList || webhookData.toolCallList || webhookData.toolCalls || []
+          const toolCallResults = await this.handleToolCalls(webhookData.customer?.id || '', demoToolCalls, language)
           return { status: 'tool_calls_processed', results: toolCallResults }
 
         case 'transcript-updated':
@@ -518,7 +650,7 @@ export class MultilingualWebhookHandler {
     try {
       console.log(`🤖 Assistant request for customer ${customerId}`)
 
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
 
       // 1. Fetch the organization's subscription details
       const { data: org, error: orgError } = await supabase
@@ -677,7 +809,7 @@ export class MultilingualWebhookHandler {
     language: 'en' | 'es'
   ): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
       await supabase
         .from('webhook_events')
@@ -706,7 +838,7 @@ export class MultilingualWebhookHandler {
     data: any
   ): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
       await supabase
         .from('call_logs')

@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -56,23 +56,29 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check if user is already a member
-    const { data: existingMember } = await supabase
-      .from('organization_members')
+    // Use service role client to check for existing user by email
+    const supabaseAdmin = createServiceRoleClient()
+    const { data: userProfile } = await supabaseAdmin
+      .from('user_profiles')
       .select('id')
-      .eq('organization_id', organization_id)
-      .eq('user_id', (await supabase
-        .from('auth.users')
-        .select('id')
-        .eq('email', email)
-        .single())?.data?.id || '')
+      .eq('email', email)
       .single()
 
-    if (existingMember) {
-      return NextResponse.json(
-        { error: 'This user is already a member of the organization' },
-        { status: 400 }
-      )
+    if (userProfile) {
+      // Check if this user is already a member
+      const { data: existingMember } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', organization_id)
+        .eq('user_id', userProfile.id)
+        .single()
+
+      if (existingMember) {
+        return NextResponse.json(
+          { error: 'This user is already a member of the organization' },
+          { status: 400 }
+        )
+      }
     }
 
     // Check for existing pending invitation

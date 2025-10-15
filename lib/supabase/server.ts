@@ -29,6 +29,25 @@ export async function createServerClient() {
   )
 }
 
+export function createServiceRoleClient() {
+  return createSupabaseServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return [];
+        },
+        setAll(cookiesToSet) {},
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
+}
+
 export async function getUser() {
   const supabase = await createServerClient()
   const { data: { user }, error } = await supabase.auth.getUser()

@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         calendly_api_key: null,
         calendly_user_uri: null,
         calendar_metadata: {}
-      })
+      } as any)
       .eq('id', organizationId)
 
     if (error) {

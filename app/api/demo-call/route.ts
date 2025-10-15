@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
+      return NextResponse.json({ error: error.issues }, { status: 400 })
     }
     console.error('Error processing demo call request:', error)
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })

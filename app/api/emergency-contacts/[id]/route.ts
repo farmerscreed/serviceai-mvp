@@ -15,7 +15,7 @@ export async function GET(
     }
     
     // Get emergency contact with organization access check via RLS
-    const { data: contact, error } = await supabase
+    const { data: contact, error } = await (supabase as any)
       .from('emergency_contacts')
       .select('*')
       .eq('id', id)
@@ -58,7 +58,7 @@ export async function PATCH(
     const body = await request.json()
     
     // Get existing contact to verify access and get organization_id
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: fetchError } = await (supabase as any)
       .from('emergency_contacts')
       .select('organization_id, is_primary')
       .eq('id', id)
@@ -73,7 +73,7 @@ export async function PATCH(
     
     // If this is being set as primary, unset other primary contacts
     if (body.is_primary && !existing.is_primary) {
-      await supabase
+      await (supabase as any)
         .from('emergency_contacts')
         .update({ is_primary: false })
         .eq('organization_id', existing.organization_id)
@@ -97,7 +97,7 @@ export async function PATCH(
     if (body.email_enabled !== undefined) updateData.email_enabled = body.email_enabled
     if (body.notes !== undefined) updateData.notes = body.notes
     
-    const { data: updated, error: updateError } = await supabase
+    const { data: updated, error: updateError } = await (supabase as any)
       .from('emergency_contacts')
       .update(updateData)
       .eq('id', id)
@@ -140,7 +140,7 @@ export async function DELETE(
     }
     
     // Delete emergency contact (RLS will handle access control)
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('emergency_contacts')
       .delete()
       .eq('id', id)

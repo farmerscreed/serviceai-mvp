@@ -219,3 +219,49 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+// DELETE - Bulk delete all appointments for user's organizations
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createServerClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's organizations
+    const { data: orgs, error: orgError } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+
+    if (orgError) {
+      console.error('Error fetching user organizations for bulk delete:', orgError)
+      return NextResponse.json({ success: false, error: orgError.message }, { status: 400 })
+    }
+
+    const orgIds = orgs?.map(o => o.organization_id) || []
+    if (orgIds.length === 0) {
+      return NextResponse.json({ success: true, deleted: 0 })
+    }
+
+    const { error: deleteError } = await supabase
+      .from('appointments')
+      .delete()
+      .in('organization_id', orgIds)
+
+    if (deleteError) {
+      console.error('Bulk delete appointments error:', deleteError)
+      return NextResponse.json({ success: false, error: deleteError.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('Appointments DELETE error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+

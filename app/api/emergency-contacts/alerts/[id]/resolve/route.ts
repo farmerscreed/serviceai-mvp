@@ -28,7 +28,7 @@ export async function POST(
     const alertId = id
 
     // Update the emergency notification status
-    const { data: updatedAlert, error } = await supabase
+    const { data: updatedAlert, error } = await (supabase as any)
       .from('emergency_notifications')
       .update({
         status: 'resolved',

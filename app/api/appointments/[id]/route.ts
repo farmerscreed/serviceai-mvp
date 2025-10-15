@@ -143,7 +143,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - Cancel appointment
+// DELETE - Hard delete appointment
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -158,34 +158,26 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Soft delete - mark as cancelled
-    const { data: cancelled, error } = await supabase
+    // Hard delete appointment (RLS protects cross-tenant access)
+    const { error } = await supabase
       .from('appointments')
-      .update({
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString()
-      })
+      .delete()
       .eq('id', id)
-      .select()
-      .single()
 
     if (error) {
-      console.error('Appointment cancellation error:', error)
+      console.error('Appointment delete error:', error)
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
       )
     }
 
-    console.log('✅ Appointment cancelled:', id)
+    console.log('✅ Appointment deleted:', id)
 
     // TODO: Send cancellation SMS
     // TODO: Delete calendar event
 
-    return NextResponse.json({
-      success: true,
-      message: 'Appointment cancelled successfully'
-    })
+    return NextResponse.json({ success: true })
     
   } catch (error: any) {
     console.error('Appointment DELETE error:', error)

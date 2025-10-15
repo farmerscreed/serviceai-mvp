@@ -156,6 +156,13 @@ export class MultiLanguageTemplateEngine {
       .replace(/{business_address}/g, businessData.business_address)
       .replace(/{business_email}/g, businessData.business_email)
 
+    // Add current date context (CRITICAL for availability checking)
+    const today = new Date().toISOString().split('T')[0]  // YYYY-MM-DD
+    systemPrompt += `\n\nIMPORTANT DATE CONTEXT:\n- Today's date is ${today}\n- When checking availability or booking appointments, always use dates from today forward\n- NEVER use past dates (dates before ${today})\n- Format dates as YYYY-MM-DD (e.g., ${today})\n`
+
+    // Add appointment booking workflow guidance (CRITICAL for proper tool usage)
+    systemPrompt += this.generateAppointmentBookingGuidance()
+
     // Add multilingual instructions
     if (include_multilingual_instructions) {
       systemPrompt += this.generateMultilingualInstructions(template, businessData)
@@ -270,6 +277,77 @@ Spanish Communication:
 Cultural Notes:
 English: ${template.cultural_guidelines.cultural_notes.en.join('; ')}
 Spanish: ${template.cultural_guidelines.cultural_notes.es.join('; ')}`
+  }
+
+  private generateAppointmentBookingGuidance(): string {
+    return `
+
+APPOINTMENT BOOKING TOOLS & WORKFLOW:
+
+You have access to these functions during calls:
+
+1. check_availability
+   - Purpose: Check available appointment slots before booking
+   - When to use: ALWAYS use this FIRST when customer wants an appointment
+   - Parameters needed: requested_date (YYYY-MM-DD), service_type
+   - Response: List of available time slots
+
+2. book_appointment_with_sms
+   - Purpose: Book the appointment and send SMS confirmation
+   - When to use: ONLY after checking availability and confirming details
+   - Parameters needed: All customer information (name, phone, address, etc.)
+   - Response: Confirmation with appointment ID
+
+CRITICAL BOOKING WORKFLOW - FOLLOW THIS SEQUENCE:
+
+Step 1: Customer Request
+   - Customer says they want to book an appointment
+   - Ask what type of service they need
+   - Ask for their preferred date
+
+Step 2: Check Availability (MANDATORY)
+   - Call check_availability with requested_date and service_type
+   - Wait for response with available time slots
+   - CRITICAL: Use the exact message from the tool response - do not modify it
+   - The tool response will include a formatted message like: "I have 6 available time slots for repair on 2025-10-14: 9:00 AM, 10:30 AM, 12:00 PM, 1:30 PM, 3:00 PM, 4:30 PM. Which works best for you?"
+   - Present this message exactly as received to the customer
+   - If customer asks for a specific time not available, suggest the closest alternatives
+
+Step 3: Gather Information
+   - After customer selects a time, collect:
+     * Full name
+     * Phone number (verify format)
+     * Email address (optional but recommended)
+     * Complete service address
+     * Any special requirements
+
+Step 4: Confirm Details
+   - Repeat all details back to customer
+   - Example: "Let me confirm: [Service type] on [date] at [time] for [name] at [address]. Is this correct?"
+   - Wait for customer confirmation
+
+Step 5: Book Appointment
+   - Only after customer confirms, call book_appointment_with_sms
+   - Provide ALL required parameters
+   - Wait for booking confirmation
+
+Step 6: Confirm to Customer
+   - Tell customer: "Perfect! Your appointment is confirmed for [date] at [time]."
+   - Tell customer: "You'll receive a confirmation text message shortly at [phone number]."
+   - Provide any additional relevant information
+
+CRITICAL RULES:
+❌ NEVER book without calling check_availability first
+❌ NEVER book without customer confirmation of all details
+❌ NEVER skip collecting required information
+✅ ALWAYS check availability before presenting time options
+✅ ALWAYS confirm details before booking
+✅ ALWAYS tell customer they'll receive SMS confirmation
+
+ERROR HANDLING:
+- If check_availability returns no slots: Offer alternative dates
+- If booking fails: Apologize and offer to try again or take manual reservation
+- If customer provides invalid information: Politely ask for correction`
   }
 
   // =====================================================

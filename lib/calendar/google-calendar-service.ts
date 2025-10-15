@@ -55,6 +55,7 @@ export class GoogleCalendarService {
           calendar_provider: 'google',
           google_refresh_token: tokens.refresh_token,
           calendar_sync_enabled: true,
+          google_calendar_id: 'primary',
           calendar_metadata: {
             access_token_expires_at: tokens.expiry_date,
             scope: tokens.scope,

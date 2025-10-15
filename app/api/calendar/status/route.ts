@@ -45,21 +45,21 @@ export async function GET(request: NextRequest) {
     }
 
     const isConnected = !!(
-      organization?.calendar_sync_enabled &&
-      organization?.calendar_provider &&
+      (organization as any)?.calendar_sync_enabled &&
+      (organization as any)?.calendar_provider &&
       (
-        organization?.google_calendar_id ||
-        organization?.outlook_calendar_id ||
-        organization?.calendly_user_uri
+        (organization as any)?.google_calendar_id ||
+        (organization as any)?.outlook_calendar_id ||
+        (organization as any)?.calendly_user_uri
       )
     )
 
     return NextResponse.json({
       success: true,
       connected: isConnected,
-      provider: organization?.calendar_provider || null,
-      syncEnabled: organization?.calendar_sync_enabled || false,
-      metadata: organization?.calendar_metadata || {}
+      provider: (organization as any)?.calendar_provider || null,
+      syncEnabled: (organization as any)?.calendar_sync_enabled || false,
+      metadata: (organization as any)?.calendar_metadata || {}
     })
   } catch (error: any) {
     console.error('Calendar status error:', error)

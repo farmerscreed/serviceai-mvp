@@ -9,7 +9,7 @@ export default function QuickActions() {
       title: 'Test Call Your Assistant',
       description: 'Make a test call to verify everything works',
       icon: Phone,
-      href: '/settings/assistant',
+      href: '/assistants',
       variant: 'primary' as const,
     },
     {

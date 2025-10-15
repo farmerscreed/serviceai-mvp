@@ -70,7 +70,7 @@ export async function GET() {
   // Flatten the organization name
   const formattedCallLogs = callLogs.map(log => ({
     ...log,
-    organization_name: Array.isArray(log.organizations) ? log.organizations[0]?.name || 'N/A' : log.organizations?.name || 'N/A',
+    organization_name: Array.isArray(log.organizations) ? (log.organizations[0] as any)?.name || 'N/A' : (log.organizations as any)?.name || 'N/A',
   }))
 
   return NextResponse.json(formattedCallLogs)

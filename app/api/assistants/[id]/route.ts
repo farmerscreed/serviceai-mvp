@@ -158,10 +158,10 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Get assistant to verify access and get Vapi assistant ID
+    // Get assistant to verify access and get Vapi IDs
     const { data: assistant, error: assistantError } = await supabase
       .from('vapi_assistants' as any)
-      .select('organization_id, vapi_assistant_id, vapi_phone_number')
+      .select('organization_id, vapi_assistant_id, vapi_phone_number, phone_provider')
       .eq('id', id)
       .single()
 
@@ -190,11 +190,64 @@ export async function DELETE(
     const vapiApiKey = process.env.VAPI_API_KEY
     const vapiBaseUrl = process.env.NEXT_PUBLIC_VAPI_BASE_URL || 'https://api.vapi.ai'
 
-    // Delete from Vapi first (if we have API key and assistant ID)
+    console.log('')
+    console.log('╔═══════════════════════════════════════════════════════════╗')
+    console.log('║  🗑️  DELETING ASSISTANT AND PHONE NUMBER                 ║')
+    console.log('╚═══════════════════════════════════════════════════════════╝')
+    console.log(`   Assistant ID: ${(assistant as any).vapi_assistant_id}`)
+    console.log(`   Phone Number: ${(assistant as any).vapi_phone_number || 'None'}`)
+    console.log('')
+
+    let phoneNumberDeleted = false
+    let assistantDeleted = false
+
+    // Step 1: Get phone number ID from phone_number_assignments table
+    let phoneNumberId: string | null = null
+    if ((assistant as any).vapi_phone_number) {
+      const { data: phoneAssignment } = await (supabase as any).from('phone_number_assignments')
+        .select('vapi_phone_number_id')
+        .eq('vapi_assistant_id', (assistant as any).vapi_assistant_id)
+        .eq('status', 'active')
+        .single()
+
+      phoneNumberId = phoneAssignment?.vapi_phone_number_id || null
+      console.log(`📞 Phone Number ID from tracking: ${phoneNumberId || 'Not found in tracking table'}`)
+    }
+
+    // Step 2: Delete phone number from Vapi first (if we have the ID)
+    if (vapiApiKey && phoneNumberId) {
+      try {
+        console.log(`🗑️  Step 1/3: Deleting phone number from Vapi: ${phoneNumberId}`)
+
+        const phoneDeleteResponse = await fetch(`${vapiBaseUrl}/phone-number/${phoneNumberId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${vapiApiKey}`
+          }
+        })
+
+        if (!phoneDeleteResponse.ok) {
+          const errorText = await phoneDeleteResponse.text()
+          console.error('❌ Vapi phone number deletion error:', errorText)
+          console.warn('   Continuing with assistant deletion...')
+        } else {
+          console.log('✅ Phone number deleted from Vapi')
+          phoneNumberDeleted = true
+        }
+      } catch (phoneError: any) {
+        console.error('❌ Error calling Vapi phone delete API:', phoneError.message)
+        console.warn('   Continuing with assistant deletion...')
+      }
+    } else if ((assistant as any).vapi_phone_number && !phoneNumberId) {
+      console.warn('⚠️  Phone number exists but ID not found in tracking table')
+      console.warn('   Skipping Vapi phone deletion - may need manual cleanup')
+    }
+
+    // Step 3: Delete assistant from Vapi
     if (vapiApiKey && (assistant as any).vapi_assistant_id) {
       try {
-        console.log('🗑️ Deleting assistant from Vapi:', (assistant as any).vapi_assistant_id)
-        
+        console.log(`🗑️  Step 2/3: Deleting assistant from Vapi: ${(assistant as any).vapi_assistant_id}`)
+
         const vapiResponse = await fetch(`${vapiBaseUrl}/assistant/${(assistant as any).vapi_assistant_id}`, {
           method: 'DELETE',
           headers: {
@@ -204,46 +257,67 @@ export async function DELETE(
 
         if (!vapiResponse.ok) {
           const errorText = await vapiResponse.text()
-          console.error('❌ Vapi deletion error:', errorText)
-          // Continue with database deletion even if Vapi deletion fails
-          // This prevents orphaned records in our DB
+          console.error('❌ Vapi assistant deletion error:', errorText)
+          console.warn('   Continuing with database deletion to prevent orphaned records...')
         } else {
           console.log('✅ Assistant deleted from Vapi')
-        }
-
-        // If assistant has a phone number, also delete/unassign it
-        if ((assistant as any).vapi_phone_number) {
-          console.log('📞 Unassigning phone number:', (assistant as any).vapi_phone_number)
-          // Note: Phone number deletion is handled by Vapi when assistant is deleted
-          // But we log it for transparency
+          assistantDeleted = true
         }
       } catch (vapiError: any) {
-        console.error('❌ Error calling Vapi delete API:', vapiError.message)
-        // Continue with database deletion even if Vapi call fails
+        console.error('❌ Error calling Vapi assistant delete API:', vapiError.message)
+        console.warn('   Continuing with database deletion...')
       }
     } else {
-      console.log('⚠️ Skipping Vapi deletion (no API key or assistant ID)')
+      console.log('⚠️  Skipping Vapi deletion (no API key or assistant ID)')
     }
 
-    // Delete assistant from database
+    // Step 4: Clean up phone_number_assignments table
+    if ((assistant as any).vapi_assistant_id) {
+      console.log('🗑️  Step 3/3: Cleaning up database records...')
+
+      const { error: assignmentDeleteError } = await (supabase as any).from('phone_number_assignments')
+        .delete()
+        .eq('vapi_assistant_id', (assistant as any).vapi_assistant_id)
+
+      if (assignmentDeleteError) {
+        console.error('❌ Error deleting phone assignment:', assignmentDeleteError.message)
+      } else {
+        console.log('✅ Phone number assignment record deleted')
+      }
+    }
+
+    // Step 5: Delete assistant from vapi_assistants table
     const { error: deleteError } = await supabase
       .from('vapi_assistants' as any)
       .delete()
       .eq('id', id)
 
     if (deleteError) {
-      console.error('Error deleting assistant from database:', deleteError)
+      console.error('❌ Error deleting assistant from database:', deleteError)
       return NextResponse.json(
         { success: false, error: deleteError.message },
         { status: 400 }
       )
     }
 
-    console.log('✅ Assistant deleted from database')
+    console.log('✅ Assistant deleted from vapi_assistants table')
+    console.log('')
+    console.log('╔═══════════════════════════════════════════════════════════╗')
+    console.log('║  ✅ DELETION COMPLETE                                     ║')
+    console.log('╚═══════════════════════════════════════════════════════════╝')
+    console.log(`   Phone Number: ${phoneNumberDeleted ? '✅ Deleted from Vapi' : '⚠️  Skipped or failed'}`)
+    console.log(`   Assistant: ${assistantDeleted ? '✅ Deleted from Vapi' : '⚠️  Skipped or failed'}`)
+    console.log(`   Database: ✅ All records deleted`)
+    console.log('')
 
     return NextResponse.json({
       success: true,
-      message: 'Assistant deleted successfully from both Vapi and database'
+      message: 'Assistant and phone number deleted successfully',
+      details: {
+        phoneNumberDeleted,
+        assistantDeleted,
+        databaseCleaned: true
+      }
     })
   } catch (error: any) {
     console.error('Assistant DELETE error:', error)

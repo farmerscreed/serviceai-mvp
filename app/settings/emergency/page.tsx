@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth/auth-context'
 import { useOrganization } from '@/lib/organizations/organization-context'
-import { useToast } from '@/components/ui/Toast'
+import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import EmergencyContactModal from '@/components/EmergencyContactModal'
 import Link from 'next/link'
 import {
   AlertCircle,
@@ -287,6 +288,19 @@ export default function EmergencySettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Emergency Contact Modal */}
+      <EmergencyContactModal
+        isOpen={showAddModal || !!editingContact}
+        onClose={() => {
+          setShowAddModal(false)
+          setEditingContact(null)
+        }}
+        onSave={() => {
+          loadContacts()
+        }}
+        contact={editingContact}
+      />
     </div>
   )
 }

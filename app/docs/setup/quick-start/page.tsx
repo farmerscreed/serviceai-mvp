@@ -143,7 +143,7 @@ export default function QuickStartPage() {
                   <ul className="space-y-1 text-sm text-gray-600">
                     <li>• <Link href="/docs/integrations/calendar-setup" className="text-blue-600 hover:text-blue-700">Connect your calendar</Link></li>
                     <li>• <Link href="/docs/integrations/vapi-setup" className="text-blue-600 hover:text-blue-700">Customize your assistant</Link></li>
-                    <li>• <Link href="/settings/assistant" className="text-blue-600 hover:text-blue-700">Test your assistant</Link></li>
+                    <li>• <Link href="/assistants" className="text-blue-600 hover:text-blue-700">Test your assistant</Link></li>
                   </ul>
                 </div>
                 <div>

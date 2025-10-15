@@ -69,7 +69,7 @@ export async function GET() {
 
   // Calculate remaining minutes for each organization
   const organizationsWithUsage = organizations.map(org => {
-    const monthlyMinutesAllocation = Array.isArray(org.subscription_plans) ? org.subscription_plans[0]?.included_minutes || 0 : org.subscription_plans?.included_minutes || 0
+    const monthlyMinutesAllocation = Array.isArray(org.subscription_plans) ? (org.subscription_plans[0] as any)?.included_minutes || 0 : (org.subscription_plans as any)?.included_minutes || 0
     const minutesUsed = org.minutes_used_this_cycle || 0
     const creditMinutes = org.credit_minutes || 0
 

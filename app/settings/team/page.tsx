@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth/auth-context'
 import { useOrganization } from '@/lib/organizations/organization-context'
-import { useToast } from '@/components/ui/Toast'
+import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import Link from 'next/link'
 import {
@@ -98,7 +98,12 @@ export default function TeamSettingsPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    if (!currentOrganization) {
+      toast.error('No organization selected')
+      return
+    }
+
     if (!inviteForm.email.trim()) {
       toast.warning('Please enter an email address')
       return
@@ -106,10 +111,11 @@ export default function TeamSettingsPage() {
 
     setInviteLoading(true)
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization?.organization_id}/invite`, {
+      const response = await fetch('/api/organizations/invitations/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          organization_id: currentOrganization.organization_id,
           email: inviteForm.email,
           role: inviteForm.role
         }),

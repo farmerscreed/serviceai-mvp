@@ -90,7 +90,7 @@ export default function SetupProgress({ organizationId }: SetupProgressProps) {
           name: 'Make Test Call',
           description: 'Try calling your AI assistant',
           completed: false, // TODO: Track test calls
-          href: '/settings/assistant',
+          href: '/assistants',
         },
       ]
 

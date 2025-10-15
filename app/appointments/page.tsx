@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useOrganization } from '@/lib/organizations/organization-context'
-import { useToast } from '@/components/ui/Toast'
+import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { LoadingList, EmptyAppointments, LoadingButton } from '@/components/ui/LoadingStates'
 import { 
@@ -41,7 +41,7 @@ interface Appointment {
 export default function AppointmentsPage() {
   const { currentOrganization } = useOrganization()
   const router = useRouter()
-  const toast = useToast()
+  const { toast } = useToast()
   const { confirm } = useConfirm()
   
   const [searchQuery, setSearchQuery] = useState('')
@@ -151,15 +151,15 @@ export default function AppointmentsPage() {
       })
 
       if (response.ok) {
-        toast.success('Appointment cancelled successfully')
+        toast({ title: 'Success', description: 'Appointment cancelled successfully' })
         await loadAppointments()
       } else {
         const data = await response.json()
-        toast.error(data.error || 'Failed to cancel appointment')
+        toast({ title: 'Error', description: data.error || 'Failed to cancel appointment' })
       }
     } catch (error) {
       console.error('Error cancelling appointment:', error)
-      toast.error('Error cancelling appointment')
+      toast({ title: 'Error', description: 'Error cancelling appointment' })
     } finally {
       setActionLoading(null)
     }
@@ -184,15 +184,53 @@ export default function AppointmentsPage() {
       })
 
       if (response.ok) {
-        toast.success('Appointment marked as completed')
+        toast({ title: 'Success', description: 'Appointment marked as completed' })
         await loadAppointments()
       } else {
         const data = await response.json()
-        toast.error(data.error || 'Failed to update appointment')
+        toast({ title: 'Error', description: data.error || 'Failed to update appointment' })
       }
     } catch (error) {
       console.error('Error updating appointment:', error)
-      toast.error('Error updating appointment')
+      toast({ title: 'Error', description: 'Error updating appointment' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDelete = async (appointment: Appointment) => {
+    const confirmed = await confirm({
+      title: 'Delete Appointment?',
+      message: `This will permanently delete the appointment with ${appointment.customerName}. Continue?`,
+      confirmText: 'Yes, Delete',
+      variant: 'danger',
+    })
+
+    if (!confirmed) return
+
+    setActionLoading(appointment.id)
+    try {
+      const response = await fetch(`/api/appointments/${appointment.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast({ title: 'Deleted', description: 'Appointment deleted successfully' })
+        await loadAppointments()
+      } else {
+        let message = 'Failed to delete appointment'
+        try {
+          const contentType = response.headers.get('content-type') || ''
+          if (contentType.includes('application/json')) {
+            const data = await response.json()
+            message = data.error || message
+          }
+        } catch {}
+        toast({ title: 'Error', description: message })
+      }
+    } catch (error) {
+      console.error('Error deleting appointment:', error)
+      toast({ title: 'Error', description: 'Error deleting appointment' })
     } finally {
       setActionLoading(null)
     }
@@ -219,13 +257,48 @@ export default function AppointmentsPage() {
               <p className="text-gray-600">{currentOrganization?.organization_name}</p>
             </div>
           </div>
-          <Link
-            href="/appointments/create"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Appointment
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/appointments/create"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Appointment
+            </Link>
+            <LoadingButton
+              loading={actionLoading === 'bulk-delete'}
+              onClick={async () => {
+                const confirmed = await confirm({
+                  title: 'Delete ALL Appointments?',
+                  message: 'This will permanently delete all appointments in your organizations.',
+                  confirmText: 'Yes, Delete All',
+                  variant: 'danger',
+                })
+                if (!confirmed) return
+                setActionLoading('bulk-delete')
+                try {
+                  const res = await fetch('/api/appointments', { method: 'DELETE' })
+                  if (res.ok) {
+                    toast({ title: 'Deleted', description: 'All appointments deleted' })
+                    await loadAppointments()
+                  } else {
+                    const data = await res.json().catch(() => ({} as any))
+                    toast({ title: 'Error', description: data.error || 'Failed to delete all appointments' })
+                  }
+                } catch (err) {
+                  toast({ title: 'Error', description: 'Bulk delete failed' })
+                } finally {
+                  setActionLoading(null)
+                }
+              }}
+              variant="danger"
+              size="sm"
+              className="ml-2 text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete All
+            </LoadingButton>
+          </div>
         </div>
 
         {/* Filters */}
@@ -356,6 +429,17 @@ export default function AppointmentsPage() {
                              Cancel
                            </LoadingButton>
                          )}
+
+                          <LoadingButton
+                            loading={actionLoading === apt.id}
+                            onClick={() => handleDelete(apt)}
+                            variant="danger"
+                            size="sm"
+                            className="text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </LoadingButton>
                 </div>
               </div>
             ))

@@ -2,9 +2,10 @@
 // Creates and manages Vapi.ai assistants with multi-language support
 
 import { TemplateService } from '@/lib/templates/template-service'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import type { BusinessData, IndustryTemplate } from '@/lib/templates/types'
 import { createDirectVapiClient, type VapiAssistant as DirectVapiAssistant } from './direct-vapi-client'
+import { createPhonePoolManager } from './phone-pool-manager'
 
 // Vapi.ai types (simplified for this implementation)
 interface VapiClient {
@@ -42,6 +43,7 @@ interface VapiAssistantConfig {
     pitch: number
   }
   serverUrl: string
+  serverMessages?: string[]
   firstMessage: string
 }
 
@@ -98,6 +100,8 @@ export class MultilingualVapiService {
         this.vapiClient = await this.createVapiClient()
       }
 
+
+
       // 1. Load template with language fallback
       const template = await this.templateService.getTemplate(industryCode, languagePreference)
       if (!template) {
@@ -142,11 +146,30 @@ export class MultilingualVapiService {
           language: 'multi' // Enables automatic language detection
         },
         voice: voiceConfig,
-        serverUrl: webhookBaseUrl ? `${webhookBaseUrl}/api/webhooks/vapi/${organizationId}` : `https://app.serviceai.com/api/webhooks/vapi/${organizationId}`,
+        serverUrl: webhookBaseUrl ? `${webhookBaseUrl}/api/webhooks/vapi` : `https://app.serviceai.com/api/webhooks/vapi`,
+        serverMessages: [
+          "status-update",
+          "tool-calls",
+          "speech-update",
+          "hang",
+          "function-call",
+          "end-of-call-report"
+        ],
         firstMessage: template.template_config.greeting_template.replace(/{(\w+)}/g, (match, key) => (businessData as any)[key] || match)
       }
 
       const assistant = await this.vapiClient.assistants.create(assistantConfig)
+
+      // 7. Store configuration first, so phone assignment can link to it
+      await this.saveAssistantConfiguration(
+        organizationId,
+        industryCode,
+        languagePreference,
+        assistant.id,
+        template.id,
+        businessData,
+        voiceConfig
+      )
 
       // 6. Automatically provision and assign phone number
       let phoneNumber: string | undefined
@@ -170,18 +193,6 @@ export class MultilingualVapiService {
         // Continue without phone number - assistant is still created
       }
 
-      // 7. Store configuration with phone number
-      await this.saveAssistantConfiguration(
-        organizationId,
-        industryCode,
-        languagePreference,
-        assistant.id,
-        template.id,
-        businessData,
-        voiceConfig,
-        phoneNumber
-      )
-
       console.log(`✅ Created multilingual assistant: ${assistant.id}${phoneNumber ? ` with phone: ${phoneNumber}` : ''}`)
       return {
         ...assistant,
@@ -196,17 +207,29 @@ export class MultilingualVapiService {
 
   /**
    * Provision and assign a phone number to an assistant with intelligent fallback
-   * 
+   *
+   * PHONE POOL STRATEGY (NEW - implements user's brilliant suggestion!):
+   * - Searches for UNASSIGNED phone numbers in the pool FIRST
+   * - Reuses existing Vapi numbers when assistants are deleted
+   * - Only creates NEW numbers if pool is empty
+   * - Extended polling (10 minutes) to wait for number provisioning
+   *
    * MULTI-TENANT AWARE:
    * - Each organization can have its own phone number configuration
-   * - Checks organization-specific settings first, then falls back to global config
-   * 
-   * PRIORITY ORDER (based on https://docs.vapi.ai/api-reference/phone-numbers/create):
-   * 1. Organization's Twilio numbers (if configured per-org)
-   * 2. Global Twilio fallback (if configured globally)
-   * 3. FREE Vapi SIP number (up to 10 free numbers globally) - RECOMMENDED
-   * 4. Organization's BYO SIP trunk (if configured per-org)
-   * 5. Manual assignment via Vapi Dashboard
+   * - Prioritizes FREE Vapi numbers for optimal cost and simplicity
+   *
+   * OPTIMIZED PRIORITY ORDER:
+   * 1. Reuse unassigned Vapi phone numbers from pool (SMART!)
+   * 2. Create new FREE Vapi Phone Number if pool empty (up to 10 free per account)
+   * 3. Organization's Twilio numbers (if configured per-org, for scaling beyond 10)
+   * 4. Global Twilio fallback (backward compatibility)
+   * 5. Manual assignment via Vapi Dashboard (emergency fallback)
+   *
+   * WHY PHONE POOL FIRST:
+   * - Instant availability (no waiting for provisioning)
+   * - Maximizes use of 10 free numbers
+   * - Prevents hitting limit prematurely
+   * - Zero cost for first 10 assistants (not 10 numbers!)
    */
   async provisionAndAssignNumber(params: {
     organizationId: string
@@ -215,40 +238,95 @@ export class MultilingualVapiService {
     areaCode?: string
   }): Promise<{ phoneNumber: string; phoneNumberId: string } | null> {
     try {
-      console.log('📞 Starting MULTI-TENANT phone number provisioning')
+      console.log('')
+      console.log('╔═══════════════════════════════════════════════════════════╗')
+      console.log('║  📱 INTELLIGENT PHONE NUMBER PROVISIONING                 ║')
+      console.log('╚═══════════════════════════════════════════════════════════╝')
       console.log(`   Organization: ${params.organizationId}`)
       console.log(`   Assistant: ${params.assistantId}`)
-      
-      // Get organization-specific phone configuration from database
+      console.log(`   Strategy: Pool Reuse → New Vapi → Twilio → Manual`)
+      console.log('')
+
+      // ═══════════════════════════════════════════════════════════════════
+      // STRATEGY 1: Use Phone Pool Manager (SMART REUSE + EXTENDED POLLING)
+      // ═══════════════════════════════════════════════════════════════════
+      console.log('🎯 STRATEGY 1: Using Phone Pool Manager...')
+      console.log('   ✅ Checks for unassigned numbers FIRST')
+      console.log('   ✅ Creates new if pool empty')
+      console.log('   ✅ Polls for 10 minutes (extended timeout)')
+      console.log('')
+
+      try {
+        const poolManager = createPhonePoolManager()
+        const result = await poolManager.assignPhoneNumberToAssistant({
+          organizationId: params.organizationId,
+          assistantId: params.assistantId,
+          country: params.country,
+          areaCode: params.areaCode
+        })
+
+        if (result) {
+          // Track assignment in database
+          await this.trackPhoneNumberAssignment({
+            organizationId: params.organizationId,
+            assistantId: params.assistantId,
+            phoneNumber: result.phoneNumber,
+            phoneProvider: 'vapi',
+            vapiPhoneNumberId: result.phoneNumberId
+          })
+
+          // Persist to database
+          await this.persistPhoneNumber(params.assistantId, result.phoneNumber, 'vapi')
+
+          console.log('')
+          console.log('╔═══════════════════════════════════════════════════════════╗')
+          console.log('║  ✅ PHONE NUMBER ASSIGNED SUCCESSFULLY                    ║')
+          console.log('╚═══════════════════════════════════════════════════════════╝')
+          console.log(`   Phone Number: ${result.phoneNumber}`)
+          console.log(`   Source: ${result.source === 'pool' ? 'Pool (reused)' : result.source === 'new' ? 'New Vapi number' : 'Twilio'}`)
+          console.log(`   Was Reused: ${result.wasReused ? 'Yes' : 'No'}`)
+          console.log(`   Cost: $0.00 (FREE)`)
+          console.log('')
+
+          return {
+            phoneNumber: result.phoneNumber,
+            phoneNumberId: result.phoneNumberId
+          }
+        }
+
+        console.warn('⚠️ Phone Pool Manager could not provision Vapi number')
+        console.warn('   Likely hit 10-number limit - falling back to Twilio...')
+        console.warn('')
+      } catch (poolError: any) {
+        console.error('❌ Phone Pool Manager error:', poolError.message)
+        console.warn('💡 Falling back to Twilio configuration...')
+        console.warn('')
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
+      // STRATEGY 2: Organization's own Twilio numbers (MULTI-TENANT)
+      // ═══════════════════════════════════════════════════════════════════
       const supabase = await createServerClient()
       const { data: org, error: orgError } = await supabase
         .from('organizations')
-        .select('phone_provider, twilio_account_sid, twilio_auth_token, twilio_phone_numbers, byo_sip_credential_id')
+        .select('phone_provider, twilio_account_sid, twilio_auth_token, twilio_phone_numbers, organization_name')
         .eq('id', params.organizationId)
         .single()
-      
+
       if (orgError) {
         console.warn('⚠️ Could not fetch organization config:', orgError.message)
       }
-      
-      console.log(`   Org phone provider: ${org?.phone_provider || 'not set'}`)
-      
-      // Get global fallback configuration from environment
-      const globalTwilioSid = process.env.TWILIO_ACCOUNT_SID
-      const globalTwilioToken = process.env.TWILIO_AUTH_TOKEN
-      const globalTwilioPhone = process.env.TWILIO_PHONE_NUMBER
-      const globalByoCredentialId = process.env.BYO_SIP_CREDENTIAL_ID
-      
-      // STRATEGY 1: Organization's own Twilio numbers (MULTI-TENANT)
+
       if (org?.twilio_account_sid && org?.twilio_auth_token && org?.twilio_phone_numbers?.length > 0) {
-        console.log('📞 Strategy 1: Using ORGANIZATION-SPECIFIC Twilio numbers...')
+        console.log('🎯 STRATEGY 2: Using ORGANIZATION-SPECIFIC Twilio numbers...')
         console.log(`   Organization has ${org.twilio_phone_numbers.length} Twilio number(s)`)
-        
+
         // Find an available number from this organization's pool
         const availableNumber = await this.findAvailableOrgPhoneNumber(params.organizationId, org.twilio_phone_numbers)
-        
+
         if (availableNumber) {
           try {
+            const directClient = createDirectVapiClient()
             const twilioNumberConfig = {
               provider: 'twilio' as const,
               number: availableNumber,
@@ -257,36 +335,37 @@ export class MultilingualVapiService {
               assistantId: params.assistantId,
               name: `${org?.organization_name || 'Org'} Assistant ${params.assistantId.substring(0, 8)}`,
             }
-            
+
             console.log('📞 Importing organization Twilio number:', availableNumber)
-            const phoneNumber = await this.vapiClient!.phoneNumbers.create(twilioNumberConfig)
-            
-            console.log('✅ Organization Twilio number imported:', phoneNumber.number)
+            const phoneNumber = await directClient.createPhoneNumber(twilioNumberConfig)
+
+            console.log('✅ Organization Twilio number imported:', phoneNumber.number || availableNumber)
             console.log('💡 Using dedicated number from organization\'s Twilio account')
-            
+
+            const finalNumber = phoneNumber.number || availableNumber
+
             // Track the assignment
             await this.trackPhoneNumberAssignment({
               organizationId: params.organizationId,
               assistantId: params.assistantId,
-              phoneNumber: phoneNumber.number,
+              phoneNumber: finalNumber,
               phoneProvider: 'twilio',
               vapiPhoneNumberId: phoneNumber.id
             })
-            
+
             // Persist to database
-            await this.persistPhoneNumber(params.assistantId, phoneNumber.number, 'twilio')
-            
-            return { 
-              phoneNumber: phoneNumber.number, 
-              phoneNumberId: phoneNumber.id 
+            await this.persistPhoneNumber(params.assistantId, finalNumber, 'twilio')
+
+            return {
+              phoneNumber: finalNumber,
+              phoneNumberId: phoneNumber.id
             }
           } catch (twilioError: any) {
             const errorMsg = twilioError?.message || String(twilioError)
             console.error('❌ Could not import organization Twilio number:', errorMsg)
-            
+
             if (errorMsg.includes('already exists') || errorMsg.includes('already imported')) {
               console.warn('⚠️ This number is already imported - trying next available number...')
-              // Continue to next strategy
             }
           }
         } else {
@@ -295,13 +374,20 @@ export class MultilingualVapiService {
         }
       }
 
-      // STRATEGY 2: Global Twilio fallback (for backward compatibility)
+      // ═══════════════════════════════════════════════════════════════════
+      // STRATEGY 3: Global Twilio fallback (backward compatibility)
+      // ═══════════════════════════════════════════════════════════════════
+      const globalTwilioSid = process.env.TWILIO_ACCOUNT_SID
+      const globalTwilioToken = process.env.TWILIO_AUTH_TOKEN
+      const globalTwilioPhone = process.env.TWILIO_PHONE_NUMBER
+
       if (globalTwilioSid && globalTwilioToken && globalTwilioPhone) {
-        console.log('📞 Strategy 2: Using GLOBAL Twilio fallback...')
+        console.log('🎯 STRATEGY 3: Using GLOBAL Twilio fallback...')
         console.warn('⚠️ WARNING: Using shared global Twilio number - not recommended for multi-tenant')
         console.warn('💡 BEST PRACTICE: Configure organization-specific Twilio numbers')
-        
+
         try {
+          const directClient = createDirectVapiClient()
           const twilioNumberConfig = {
             provider: 'twilio' as const,
             number: globalTwilioPhone,
@@ -310,33 +396,35 @@ export class MultilingualVapiService {
             assistantId: params.assistantId,
             name: `Assistant ${params.assistantId.substring(0, 8)}`,
           }
-          
+
           console.log('📞 Importing global Twilio number:', globalTwilioPhone)
-          const phoneNumber = await this.vapiClient!.phoneNumbers.create(twilioNumberConfig)
-          
-          console.log('✅ Global Twilio number imported:', phoneNumber.number)
+          const phoneNumber = await directClient.createPhoneNumber(twilioNumberConfig)
+
+          console.log('✅ Global Twilio number imported:', phoneNumber.number || globalTwilioPhone)
           console.log('⚠️ This is a SHARED number - configure per-organization numbers for production')
-          
+
+          const finalNumber = phoneNumber.number || globalTwilioPhone
+
           // Track the assignment
           await this.trackPhoneNumberAssignment({
             organizationId: params.organizationId,
             assistantId: params.assistantId,
-            phoneNumber: phoneNumber.number,
+            phoneNumber: finalNumber,
             phoneProvider: 'twilio',
             vapiPhoneNumberId: phoneNumber.id
           })
-          
+
           // Persist to database
-          await this.persistPhoneNumber(params.assistantId, phoneNumber.number, 'twilio')
-          
-          return { 
-            phoneNumber: phoneNumber.number, 
-            phoneNumberId: phoneNumber.id 
+          await this.persistPhoneNumber(params.assistantId, finalNumber, 'twilio')
+
+          return {
+            phoneNumber: finalNumber,
+            phoneNumberId: phoneNumber.id
           }
         } catch (twilioError: any) {
           const errorMsg = twilioError?.message || String(twilioError)
           console.error('❌ Could not import global Twilio number:', errorMsg)
-          
+
           if (errorMsg.includes('already exists') || errorMsg.includes('already imported')) {
             console.warn('⚠️ Global Twilio number already in use by another assistant')
             console.warn('💡 SOLUTION: Configure organization-specific Twilio numbers')
@@ -344,210 +432,104 @@ export class MultilingualVapiService {
         }
       }
 
-      // STRATEGY 3: Try to create a FREE Vapi SIP number (up to 10 free per account)
-      console.log('📞 Strategy 3: Attempting to create FREE Vapi SIP number...')
-      try {
-        // According to Vapi docs, for Vapi SIP numbers we use provider: 'vapi'
-        // The response will have a 'sipUri' field, not a 'number' field
-        const vapiNumberConfig = {
-          provider: 'vapi' as const,
-          assistantId: params.assistantId,
-          name: `Assistant ${params.assistantId.substring(0, 8)}`,
-        }
-        
-        console.log('📞 Requesting FREE Vapi SIP number from Vapi API...')
-        console.log('📞 Config:', JSON.stringify(vapiNumberConfig, null, 2))
-        
-        const phoneNumber = await this.vapiClient!.phoneNumbers.create(vapiNumberConfig)
-        
-        console.log('✅ FREE Vapi SIP number created and assigned:', phoneNumber.sipUri || phoneNumber.id)
-        console.log('💰 This is a free SIP number from Vapi (up to 10 free numbers per account)')
-        console.log('📞 Phone number response structure:', JSON.stringify(phoneNumber, null, 2))
-        
-        // Extract phone number - Vapi SIP numbers use 'sipUri' field
-        const sipUri: string | undefined = phoneNumber.sipUri
-        const phoneNumberId: string = phoneNumber.id
+      // ═══════════════════════════════════════════════════════════════════
+      // FALLBACK: Manual Assignment Instructions
+      // ═══════════════════════════════════════════════════════════════════
+      console.error('')
+      console.error('╔═══════════════════════════════════════════════════════════╗')
+      console.error('║  ⚠️  PHONE NUMBER PROVISIONING FAILED                    ║')
+      console.error('╚═══════════════════════════════════════════════════════════╝')
+      console.error('')
+      console.error('❌ Could not provision phone number automatically')
+      console.error('✅ Assistant was created successfully: ' + params.assistantId)
+      console.error('📞 Phone number must be assigned manually')
+      console.error('')
+      console.error('═══════════════════════════════════════════════════════════')
+      console.error('📋 QUICK FIX OPTIONS')
+      console.error('═══════════════════════════════════════════════════════════')
+      console.error('')
+      console.error('🎯 OPTION 1: Check Vapi Dashboard')
+      console.error('   • URL: https://dashboard.vapi.ai/phone-numbers')
+      console.error('   • Look for unassigned numbers in your account')
+      console.error('   • Delete unused numbers to free up pool space')
+      console.error('')
+      console.error('💳 OPTION 2: Add Twilio Integration (for 10+ customers)')
+      console.error('   • Buy Twilio number: https://console.twilio.com/us1/develop/phone-numbers/manage/search')
+      console.error('   • Add to .env.local or organization settings in database')
+      console.error('   • Restart: npm run dev')
+      console.error('')
+      console.error('🔧 OPTION 3: Manual Assignment (Quick Fix)')
+      console.error('   • Go to: https://dashboard.vapi.ai/assistants')
+      console.error('   • Find assistant: ' + params.assistantId.substring(0, 12) + '...')
+      console.error('   • Click "Assign Phone Number"')
+      console.error('')
+      console.error('═══════════════════════════════════════════════════════════')
 
-        // Track full assignment details; store compact display to satisfy DB varchar(20)
-        await this.trackPhoneNumberAssignment({
-          organizationId: params.organizationId,
-          assistantId: params.assistantId,
-          phoneNumber: sipUri || 'SIP',
-          phoneProvider: 'vapi',
-          vapiPhoneNumberId: phoneNumberId
-        })
-
-        const displayPhoneNumber = 'SIP'
-        // Persist compact value in assistants table
-        await this.persistPhoneNumber(params.assistantId, displayPhoneNumber, 'vapi')
-        
-        return { 
-          phoneNumber: displayPhoneNumber,
-          phoneNumberId: phoneNumberId 
-        }
-      } catch (vapiError: any) {
-        const errorMsg = vapiError?.message || String(vapiError)
-        console.warn('⚠️ Could not create free Vapi SIP number:', errorMsg)
-        
-        // Try alternative Vapi SIP number creation method
-        console.log('📞 Strategy 1B: Trying alternative Vapi SIP number creation...')
-        try {
-          // Try without specifying provider (let Vapi choose)
-          const altVapiConfig = {
-            assistantId: params.assistantId,
-            name: `Assistant ${params.assistantId.substring(0, 8)}`,
-          }
-          
-          console.log('📞 Trying alternative config:', JSON.stringify(altVapiConfig, null, 2))
-          const phoneNumber = await this.vapiClient!.phoneNumbers.create(altVapiConfig)
-          
-          console.log('✅ Alternative Vapi SIP number created:', phoneNumber.sipUri || phoneNumber.id)
-          console.log('📞 Alternative response structure:', JSON.stringify(phoneNumber, null, 2))
-          
-          const sipUri: string | undefined = phoneNumber.sipUri
-          const phoneNumberId: string = phoneNumber.id
-
-          // Track full assignment details; store compact display to satisfy DB varchar(20)
-          await this.trackPhoneNumberAssignment({
-            organizationId: params.organizationId,
-            assistantId: params.assistantId,
-            phoneNumber: sipUri || 'SIP',
-            phoneProvider: 'vapi',
-            vapiPhoneNumberId: phoneNumberId
-          })
-
-          const displayPhoneNumber = 'SIP'
-          await this.persistPhoneNumber(params.assistantId, displayPhoneNumber, 'vapi')
-            return { 
-            phoneNumber: displayPhoneNumber,
-              phoneNumberId: phoneNumberId 
-          }
-        } catch (altError: any) {
-          console.warn('⚠️ Alternative Vapi SIP creation also failed:', altError.message)
-        }
-        
-        if (errorMsg.includes('limit') || errorMsg.includes('maximum') || errorMsg.includes('quota')) {
-          console.warn('⚠️ Free Vapi number limit reached (maximum 10 free SIP numbers)')
-          console.warn('💡 Falling back to Twilio strategy...')
-        } else {
-          console.warn('💡 Trying Twilio phone number providers...')
-        }
-      }
-      
-      // STRATEGY 4: Organization's BYO SIP Trunk (MULTI-TENANT)
-      if (org?.byo_sip_credential_id) {
-        console.log('📞 Strategy 4: Using ORGANIZATION-SPECIFIC BYO SIP trunk...')
-        try {
-          const byoNumberConfig = {
-            provider: 'byo-phone-number' as const,
-            credentialId: org.byo_sip_credential_id,
-            assistantId: params.assistantId,
-            name: `${org?.organization_name || 'Org'} Assistant ${params.assistantId.substring(0, 8)}`,
-          }
-          
-          console.log('📞 Creating BYO phone number with org credential:', org.byo_sip_credential_id)
-          const phoneNumber = await this.vapiClient!.phoneNumbers.create(byoNumberConfig)
-          
-          console.log('✅ Organization BYO number created:', phoneNumber.number || 'Custom SIP')
-          console.log('💡 Using organization\'s custom SIP trunk configuration')
-          
-          // Track the assignment
-          await this.trackPhoneNumberAssignment({
-            organizationId: params.organizationId,
-            assistantId: params.assistantId,
-            phoneNumber: phoneNumber.number || 'BYO-SIP',
-            phoneProvider: 'byo',
-            vapiPhoneNumberId: phoneNumber.id
-          })
-          
-          // Persist to database
-          await this.persistPhoneNumber(params.assistantId, phoneNumber.number || 'BYO-SIP', 'byo')
-          
-          return { 
-            phoneNumber: phoneNumber.number || 'BYO-SIP', 
-            phoneNumberId: phoneNumber.id 
-          }
-        } catch (byoError: any) {
-          console.error('❌ Could not create organization BYO phone number:', byoError?.message)
-        }
-      }
-      
-      // STRATEGY 5: Global BYO SIP Trunk fallback
-      if (globalByoCredentialId) {
-        console.log('📞 Strategy 5: Using GLOBAL BYO SIP trunk fallback...')
-        console.warn('⚠️ WARNING: Using shared global BYO SIP - not recommended for multi-tenant')
-        try {
-          const byoNumberConfig = {
-            provider: 'byo-phone-number' as const,
-            credentialId: globalByoCredentialId,
-            assistantId: params.assistantId,
-            name: `Assistant ${params.assistantId.substring(0, 8)}`,
-          }
-          
-          console.log('📞 Creating BYO phone number with global credential')
-          const phoneNumber = await this.vapiClient!.phoneNumbers.create(byoNumberConfig)
-          
-          console.log('✅ Global BYO number created:', phoneNumber.number || 'Custom SIP')
-          console.log('⚠️ This is a SHARED SIP trunk - configure per-organization for production')
-          
-          // Track the assignment
-          await this.trackPhoneNumberAssignment({
-            organizationId: params.organizationId,
-            assistantId: params.assistantId,
-            phoneNumber: phoneNumber.number || 'BYO-SIP',
-            phoneProvider: 'byo',
-            vapiPhoneNumberId: phoneNumber.id
-          })
-          
-          // Persist to database
-          await this.persistPhoneNumber(params.assistantId, phoneNumber.number || 'BYO-SIP', 'byo')
-          
-          return { 
-            phoneNumber: phoneNumber.number || 'BYO-SIP', 
-            phoneNumberId: phoneNumber.id 
-          }
-        } catch (byoError: any) {
-          console.error('❌ Could not create global BYO phone number:', byoError?.message)
-        }
-      }
-      
-      // No phone number provisioned - provide comprehensive guidance
-      console.warn('⚠️ Could not provision phone number automatically')
-      console.warn('')
-      console.warn('═══════════════════════════════════════════════════════════')
-      console.warn('📋 PHONE NUMBER PROVISIONING OPTIONS')
-      console.warn('═══════════════════════════════════════════════════════════')
-      console.warn('')
-      console.warn('1️⃣  FREE VAPI SIP NUMBERS (RECOMMENDED) ✨')
-      console.warn('    • Get up to 10 FREE SIP numbers from Vapi')
-      console.warn('    • No configuration needed - automatically attempted')
-      console.warn('    • May have reached limit (check Vapi Dashboard)')
-      console.warn('    • Manually create: https://dashboard.vapi.ai/phone-numbers')
-      console.warn('')
-      console.warn('2️⃣  IMPORT YOUR TWILIO NUMBER')
-      console.warn('    • Buy number: https://console.twilio.com/us1/develop/phone-numbers/manage/search')
-      console.warn('    • Add to .env.local:')
-      console.warn('      TWILIO_ACCOUNT_SID=ACxxxxxxxxx')
-      console.warn('      TWILIO_AUTH_TOKEN=xxxxxxxxx')
-      console.warn('      TWILIO_PHONE_NUMBER=+15551234567')
-      console.warn('    • Restart server: npm run dev')
-      console.warn('')
-      console.warn('3️⃣  BRING YOUR OWN SIP TRUNK')
-      console.warn('    • Add SIP trunk credential in Vapi Dashboard')
-      console.warn('    • Add to .env.local: BYO_SIP_CREDENTIAL_ID=your-credential-id')
-      console.warn('    • Restart server: npm run dev')
-      console.warn('')
-      console.warn('4️⃣  MANUAL ASSIGNMENT')
-      console.warn('    • Create/import numbers: https://dashboard.vapi.ai/phone-numbers')
-      console.warn('    • Manually assign to assistants in Vapi Dashboard')
-      console.warn('')
-      console.warn('═══════════════════════════════════════════════════════════')
-      
       return null
     } catch (error: any) {
       console.error('❌ Error provisioning phone number:', error)
       console.error('Error details:', error?.message || 'Unknown error')
       return null
+    }
+  }
+
+  /**
+   * Check how many FREE Vapi phone numbers are currently in use
+   * Helps detect when approaching the 10-number limit
+   */
+  async checkVapiFreeNumberUsage(): Promise<{
+    total: number
+    limit: number
+    remaining: number
+    percentUsed: number
+  }> {
+    try {
+      const directClient = createDirectVapiClient()
+      const allPhoneNumbers = await directClient.listPhoneNumbers()
+
+      // Count only Vapi-provided numbers (not Twilio/Vonage imports)
+      const vapiNumbers = allPhoneNumbers.filter((pn: any) =>
+        pn.provider === 'vapi' || pn.sipUri || (!pn.provider && pn.id)
+      )
+
+      const limit = 10
+      const total = vapiNumbers.length
+      const remaining = Math.max(0, limit - total)
+      const percentUsed = Math.round((total / limit) * 100)
+
+      console.log('')
+      console.log('📊 Vapi Free Number Usage:')
+      console.log(`   Used: ${total}/${limit} (${percentUsed}%)`)
+      console.log(`   Remaining: ${remaining}`)
+
+      if (remaining <= 2) {
+        console.warn('')
+        console.warn('⚠️  WARNING: Approaching FREE number limit!')
+        console.warn(`   Only ${remaining} free numbers remaining`)
+        console.warn('   Consider setting up Twilio for additional numbers')
+      }
+
+      if (remaining === 0) {
+        console.error('')
+        console.error('🚨 FREE NUMBER LIMIT REACHED (10/10 used)')
+        console.error('   Next assistant will require Twilio configuration')
+        console.error('   Or delete unused numbers from Vapi Dashboard')
+      }
+
+      return {
+        total,
+        limit,
+        remaining,
+        percentUsed
+      }
+    } catch (error: any) {
+      console.error('Error checking Vapi number usage:', error)
+      return {
+        total: 0,
+        limit: 10,
+        remaining: 10,
+        percentUsed: 0
+      }
     }
   }
 
@@ -761,82 +743,70 @@ export class MultilingualVapiService {
 
   /**
    * Create multilingual tools for Vapi assistant
+   * UPDATED: Uses reusable tool references instead of inline definitions
    */
   private createMultilingualTools(template: IndustryTemplate, organizationId: string): any[] {
+    // Get pre-created tool IDs from environment variables
+    // These tools are created ONCE and reused for all organizations
+    const CHECK_AVAILABILITY_TOOL_ID = process.env.VAPI_CHECK_AVAILABILITY_TOOL_ID
+    const BOOK_APPOINTMENT_TOOL_ID = process.env.VAPI_BOOK_APPOINTMENT_TOOL_ID
+    const EMERGENCY_CHECK_TOOL_ID = process.env.VAPI_EMERGENCY_CHECK_TOOL_ID
+    const SMS_NOTIFICATION_TOOL_ID = process.env.VAPI_SMS_NOTIFICATION_TOOL_ID
+
     const tools: any[] = []
 
-    // Enhanced emergency detection tool with language support
-    tools.push({
-      type: 'function',
-      function: {
-        name: 'check_emergency_multilingual',
-        description: `Analyze urgency for ${template.display_name} issues in multiple languages`,
-        parameters: {
-          type: 'object',
-          properties: {
-            issue_description: { type: 'string' },
-            detected_language: { type: 'string', enum: ['en', 'es'] },
-            urgency_indicators: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Keywords in detected language'
-            },
-            cultural_context: {
-              type: 'string',
-              description: 'Cultural communication style detected'
-            }
-          },
-          required: ['issue_description', 'detected_language']
-        }
-      }
-    })
+    // Emergency detection tool
+    if (EMERGENCY_CHECK_TOOL_ID) {
+      tools.push({
+        type: 'function',
+        id: EMERGENCY_CHECK_TOOL_ID
+      })
+    } else {
+      console.warn('⚠️ VAPI_EMERGENCY_CHECK_TOOL_ID not configured - emergency detection disabled')
+    }
 
-    // Enhanced appointment booking with SMS integration
-    const appointmentTypes = Object.keys(template.appointment_types)
-    tools.push({
-      type: 'function',
-      function: {
-        name: 'book_appointment_with_sms',
-        description: `Schedule ${template.display_name} appointment with SMS confirmation`,
-        parameters: {
-          type: 'object',
-          properties: {
-            service_type: { type: 'string', enum: appointmentTypes },
-            scheduled_start_time: { type: 'string', format: 'date-time' },
-            customer_name: { type: 'string' },
-            customer_phone: { type: 'string' },
-            customer_email: { type: 'string' },
-            address: { type: 'string' },
-            preferred_language: { type: 'string', enum: ['en', 'es'] },
-            sms_preference: { type: 'boolean', description: 'Customer wants SMS notifications' },
-            cultural_formality: { type: 'string', enum: ['formal', 'informal'] }
-          },
-          required: ['service_type', 'scheduled_start_time', 'customer_name', 'customer_phone', 'preferred_language']
-        }
-      }
-    })
+    // Check availability tool (NEW - CRITICAL for appointment booking)
+    if (CHECK_AVAILABILITY_TOOL_ID) {
+      tools.push({
+        type: 'function',
+        id: CHECK_AVAILABILITY_TOOL_ID
+      })
+    } else {
+      console.error('❌ VAPI_CHECK_AVAILABILITY_TOOL_ID not configured - availability checking disabled')
+      console.error('   This tool is REQUIRED for appointment booking to work correctly')
+    }
 
-    // SMS communication tool
-    tools.push({
-      type: 'function',
-      function: {
-        name: 'send_sms_notification',
-        description: 'Send SMS notification to customer in their preferred language',
-        parameters: {
-          type: 'object',
-          properties: {
-            phone_number: { type: 'string' },
-            message_type: { type: 'string', enum: Object.keys(template.sms_templates) },
-            language: { type: 'string', enum: ['en', 'es'] },
-            urgency_level: { type: 'string', enum: ['low', 'medium', 'high', 'emergency'] }
-          },
-          required: ['phone_number', 'message_type', 'language']
-        }
-      }
-    })
+    // Book appointment tool
+    if (BOOK_APPOINTMENT_TOOL_ID) {
+      tools.push({
+        type: 'function',
+        id: BOOK_APPOINTMENT_TOOL_ID
+      })
+    } else {
+      console.error('❌ VAPI_BOOK_APPOINTMENT_TOOL_ID not configured - appointment booking disabled')
+    }
+
+    // SMS notification tool
+    if (SMS_NOTIFICATION_TOOL_ID) {
+      tools.push({
+        type: 'function',
+        id: SMS_NOTIFICATION_TOOL_ID
+      })
+    } else {
+      console.warn('⚠️ VAPI_SMS_NOTIFICATION_TOOL_ID not configured - SMS notifications disabled')
+    }
+
+    // Log configuration status
+    console.log(`🔧 Configured ${tools.length} tools for assistant`)
+    if (tools.length < 4) {
+      console.warn(`⚠️ Some tools are missing. Expected 4, got ${tools.length}`)
+      console.warn('   Run: npm run setup-vapi-tools to create missing tools')
+    }
 
     return tools
   }
+
+
 
   private _createDemoAssistantConfig(name: string, industry?: string): VapiAssistantConfig {
     const systemPrompt = `
@@ -872,22 +842,11 @@ export class MultilingualVapiService {
         model: 'gpt-4',
         messages: [{ role: 'system', content: systemPrompt }],
         tools: [
-          // Integrate send_sms_notification tool
-          {
+          // Use tool ID reference for SMS notifications
+          ...(process.env.VAPI_SMS_NOTIFICATION_TOOL_ID ? [{
             type: 'function',
-            function: {
-              name: 'send_sms_notification',
-              description: 'Send an SMS notification to the user, e.g., with a signup link.',
-              parameters: {
-                type: 'object',
-                properties: {
-                  phone_number: { type: 'string', description: 'The recipient\'s phone number.' },
-                  message_content: { type: 'string', description: 'The content of the SMS message.' }
-                },
-                required: ['phone_number', 'message_content']
-              }
-            }
-          }
+            id: process.env.VAPI_SMS_NOTIFICATION_TOOL_ID
+          }] : [])
         ],
         temperature: 0.7
       },
@@ -913,6 +872,10 @@ export class MultilingualVapiService {
   private getVoiceConfig(language: 'en' | 'es', region?: string): any {
     // Note: Vapi API only supports provider, voiceId, and speed
     // The 'pitch' property causes a 400 error
+
+    // Check for custom voice ID from environment variable
+    const customVoiceId = process.env.VAPI_VOICE_ID
+
     if (language === 'es') {
       return {
         provider: 'azure',
@@ -920,9 +883,10 @@ export class MultilingualVapiService {
         speed: 1.0
       }
     } else {
+      // English voice - try custom voice first, fallback to Paige if it fails
       return {
-        provider: 'azure',
-        voiceId: 'en-US-AriaNeural', // English
+        provider: customVoiceId ? '11labs' : 'vapi',
+        voiceId: customVoiceId || 'Paige',
         speed: 1.0
       }
     }
@@ -968,7 +932,7 @@ export class MultilingualVapiService {
         search: async ({ country = 'US', areaCode = '555' }) => {
           console.log('📞 Searching phone numbers:', { country, areaCode })
           const phoneNumbers = await directClient.listPhoneNumbers()
-          
+
           // Filter by country and area code if specified
           let filtered = phoneNumbers
           if (country) {
@@ -977,7 +941,7 @@ export class MultilingualVapiService {
           if (areaCode) {
             filtered = filtered.filter((pn: any) => pn.number?.includes(areaCode))
           }
-          
+
           return filtered.map((pn: any) => ({
             id: pn.id,
             number: pn.number,
@@ -985,17 +949,30 @@ export class MultilingualVapiService {
             areaCode: pn.areaCode
           }))
         },
+        create: async (config: any) => {
+          console.log('📞 Creating phone number via Direct API...')
+          console.log('📞 Config:', JSON.stringify(config, null, 2))
+
+          // Call the Direct API client's createPhoneNumber method
+          const phoneNumber = await directClient.createPhoneNumber(config)
+
+          console.log('✅ Phone number created via Direct API')
+          console.log('📞 Response:', JSON.stringify(phoneNumber, null, 2))
+
+          return phoneNumber
+        },
         purchase: async ({ phoneNumberId }) => {
           console.log('💰 Creating/buying phone number for assistant...')
           // Create a new phone number via Vapi API
           try {
             const phoneNumber = await directClient.createPhoneNumber({
-              provider: 'twilio', // or 'vonage'
+              provider: 'vapi',
               name: `Assistant Phone ${Date.now()}`
             })
             return {
               id: phoneNumber.id,
-              number: phoneNumber.number
+              number: phoneNumber.number || phoneNumber.sipUri,
+              sipUri: phoneNumber.sipUri
             }
           } catch (error) {
             console.error('Failed to create phone number:', error)
@@ -1004,7 +981,8 @@ export class MultilingualVapiService {
               const phoneNumber = await directClient.getPhoneNumber(phoneNumberId)
               return {
                 id: phoneNumber.id,
-                number: phoneNumber.number
+                number: phoneNumber.number || phoneNumber.sipUri,
+                sipUri: phoneNumber.sipUri
               }
             } catch {
               throw new Error('Failed to provision phone number')
@@ -1020,7 +998,8 @@ export class MultilingualVapiService {
             })
             return {
               id: phoneNumber.id,
-              number: phoneNumber.number
+              number: phoneNumber.number || phoneNumber.sipUri,
+              sipUri: phoneNumber.sipUri
             }
           } catch (error) {
             console.error('Failed to assign phone number:', error)
@@ -1028,7 +1007,8 @@ export class MultilingualVapiService {
             const phoneNumber = await directClient.getPhoneNumber(phoneNumberId)
             return {
               id: phoneNumber.id,
-              number: phoneNumber.number
+              number: phoneNumber.number || phoneNumber.sipUri,
+              sipUri: phoneNumber.sipUri
             }
           }
         }
@@ -1054,7 +1034,7 @@ export class MultilingualVapiService {
     phoneNumber?: string
   ): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       const { error } = await supabase
         .from('vapi_assistants' as any)
         .insert({

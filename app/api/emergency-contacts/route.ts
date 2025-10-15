@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch emergency contacts
-    const { data: contacts, error: contactsError } = await supabase
+    const { data: contacts, error: contactsError } = await (supabase as any)
       .from('emergency_contacts')
       .select('*')
       .in('organization_id', orgIds)
@@ -109,14 +109,14 @@ export async function POST(request: NextRequest) {
 
     // If setting as primary, unset other primary contacts
     if (isPrimary) {
-      await supabase
+      await (supabase as any)
         .from('emergency_contacts')
         .update({ is_primary: false })
         .eq('organization_id', organizationId)
     }
 
     // Insert emergency contact
-    const { data: contact, error: insertError } = await supabase
+    const { data: contact, error: insertError } = await (supabase as any)
       .from('emergency_contacts')
       .insert({
         organization_id: organizationId,

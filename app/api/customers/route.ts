@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Get customers for organizations
-    let query = supabase
+    let query = (supabase as any)
       .from('customers')
       .select('*')
       .in('organization_id', orgIds)
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create customer
-    const { data: customer, error } = await supabase
+    const { data: customer, error } = await (supabase as any)
       .from('customers')
       .insert({
         organization_id: membership.organization_id,

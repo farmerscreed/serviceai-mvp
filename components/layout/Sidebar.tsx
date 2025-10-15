@@ -12,7 +12,9 @@ import {
   Phone,
   MessageSquare,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Smartphone,
+  FileText
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -48,8 +50,9 @@ const navigation: NavItem[] = [
     icon: Settings,
     children: [
       { name: 'Overview', href: '/settings' },
-      { name: 'My Assistant', href: '/settings/assistant' },
+      { name: 'My Assistant', href: '/assistants' },
       { name: 'Phone & Calendar', href: '/settings/phone-calendar' },
+      { name: 'SMS Settings', href: '/settings/sms' },
       { name: 'Emergency Contacts', href: '/settings/emergency' },
       { name: 'Team & Access', href: '/settings/team' },
       { name: 'Organization', href: '/settings/organization' },

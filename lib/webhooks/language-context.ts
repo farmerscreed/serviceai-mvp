@@ -1,7 +1,7 @@
 // Language Context Handler - Task 2.3
 // Manages language detection and customer context for webhook processing
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 import { LanguageDetector } from '@/lib/emergency/language-detector'
 
 export interface CustomerContext {
@@ -96,21 +96,22 @@ export class LanguageContext {
    */
   async getCustomerContext(customerId: string): Promise<CustomerContext | null> {
     try {
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
-      // Get customer configuration
+      // Get customer configuration (get first active assistant for this org)
       const { data: config, error } = await supabase
-        .from('customer_configurations')
+        .from('vapi_assistants')
         .select(`
           organization_id,
-          industry_template_id,
-          primary_language,
+          template_id,
+          language_code,
           business_data,
           vapi_assistant_id
         `)
         .eq('organization_id', customerId)
         .eq('is_active', true)
-        .single()
+        .limit(1)
+        .maybeSingle()
 
       if (error) {
         console.error('Error fetching customer configuration:', error)
@@ -121,7 +122,7 @@ export class LanguageContext {
       const { data: template, error: templateError } = await supabase
         .from('industry_templates')
         .select('industry_code, id')
-        .eq('id', config.industry_template_id)
+        .eq('id', config.template_id)
         .single()
 
       if (templateError) {
@@ -132,9 +133,9 @@ export class LanguageContext {
       return {
         organizationId: config.organization_id,
         industryCode: template.industry_code,
-        languagePreference: config.primary_language as 'en' | 'es',
+        languagePreference: config.language_code as 'en' | 'es',
         businessData: config.business_data,
-        templateId: config.industry_template_id,
+        templateId: config.template_id,
         assistantId: config.vapi_assistant_id
       }
 
@@ -155,7 +156,7 @@ export class LanguageContext {
     try {
       console.log(`🌍 Updating conversation language to ${language} for call ${callId}`)
 
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
       // Update call log with detected language
       await supabase
@@ -184,13 +185,13 @@ export class LanguageContext {
     language: 'en' | 'es'
   ): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
       // Update customer configuration
       await supabase
-        .from('customer_configurations')
+        .from('vapi_assistants')
         .update({
-          primary_language: language,
+          language_code: language,
           updated_at: new Date().toISOString()
         })
         .eq('organization_id', customerId)
@@ -247,7 +248,7 @@ export class LanguageContext {
     segments: Array<{ text: string; language: 'en' | 'es'; confidence: number }>
   ): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
       await supabase
         .from('webhook_events')
@@ -349,13 +350,13 @@ export class LanguageContext {
         return
       }
 
-      const supabase = await createServerClient()
+      const supabase = createServiceRoleClient()
       
       // Update customer language preference
       await supabase
-        .from('customer_configurations')
+        .from('vapi_assistants')
         .update({
-          primary_language: detectedLanguage,
+          language_code: detectedLanguage,
           updated_at: new Date().toISOString()
         })
         .eq('organization_id', customerId)

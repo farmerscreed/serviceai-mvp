@@ -29,19 +29,10 @@ export async function GET(
       )
     }
 
-    // Fetch all members with user profiles
+    // Fetch all members
     const { data: members, error: membersError } = await supabase
       .from('organization_members')
-      .select(`
-        id,
-        user_id,
-        role,
-        created_at,
-        user_profiles!inner (
-          full_name,
-          email
-        )
-      `)
+      .select('id, user_id, role, created_at')
       .eq('organization_id', id)
       .order('created_at', { ascending: true })
 
@@ -50,19 +41,30 @@ export async function GET(
       return NextResponse.json({ error: membersError.message }, { status: 400 })
     }
 
-    // Transform the data to include email at the top level
-    const transformedMembers = (members || []).map(member => {
-      const profile = (member.user_profiles as any)
-      return {
-        id: member.id,
-        user_id: member.user_id,
-        email: profile?.email || 'No email',
-        name: profile?.full_name || 'Unknown',
-        role: member.role,
-        status: 'active',
-        created_at: member.created_at
-      }
-    })
+    // Manually fetch user profiles for each member
+    const transformedMembers = await Promise.all(
+      (members || []).map(async (member) => {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('full_name, email')
+          .eq('id', member.user_id)
+          .single()
+
+        return {
+          id: member.id,
+          user_id: member.user_id,
+          organization_id: id,
+          role: member.role,
+          status: 'active',
+          user: {
+            id: member.user_id,
+            email: profile?.email || 'No email',
+            full_name: profile?.full_name || null
+          },
+          created_at: member.created_at
+        }
+      })
+    )
 
     return NextResponse.json({
       success: true,
