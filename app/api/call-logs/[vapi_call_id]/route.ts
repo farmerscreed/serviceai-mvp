@@ -3,8 +3,9 @@ import { createServerClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { vapi_call_id: string } }
+  context: { params: { vapi_call_id: string } }
 ) {
+  const { vapi_call_id } = context.params;
   try {
     const supabase = await createServerClient();
 
